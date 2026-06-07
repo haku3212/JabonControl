@@ -1,11 +1,12 @@
 import { useState } from 'react';
 
 interface VentaFormProps {
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<void>;
   onCancel: () => void;
 }
 
 export function VentaForm({ onSave, onCancel }: VentaFormProps) {
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     numeroNE: `NE-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
     fecha: new Date().toISOString().split('T')[0],
@@ -18,17 +19,26 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
 
   const total = form.cantidad * form.precioUnitario;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.cliente || form.cantidad <= 0 || form.precioUnitario <= 0) {
       alert('Por favor complete todos los campos correctamente');
       return;
     }
-    onSave({
-      ...form,
-      id: Date.now().toString(),
-      total: total,
-      precioTotal: total,
-    });
+
+    setLoading(true);
+    try {
+      await onSave({
+        ...form,
+        id: Date.now().toString(),
+        total: total,
+        precioTotal: total,
+      });
+    } catch (error) {
+      alert('Error al guardar la venta');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -128,15 +138,17 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
       <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-dark-border">
         <button
           onClick={onCancel}
-          className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow"
+          disabled={loading}
+          className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow disabled:opacity-50"
         >
           Cancelar
         </button>
         <button
           onClick={handleSubmit}
-          className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90"
+          disabled={loading}
+          className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90 disabled:opacity-50"
         >
-          💾 Guardar Venta
+          {loading ? '⏳ Guardando...' : '💾 Guardar Venta'}
         </button>
       </div>
     </div>

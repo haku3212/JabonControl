@@ -1,11 +1,12 @@
 import { useState } from 'react';
 
 interface HornadaFormProps {
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<void>;
   onCancel: () => void;
 }
 
 export function HornadaForm({ onSave, onCancel }: HornadaFormProps) {
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     numero: `H-2026-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
     fecha: new Date().toISOString().split('T')[0],

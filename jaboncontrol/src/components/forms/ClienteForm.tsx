@@ -1,11 +1,12 @@
 import { useState } from 'react';
 
 interface ClienteFormProps {
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<void>;
   onCancel: () => void;
 }
 
 export function ClienteForm({ onSave, onCancel }: ClienteFormProps) {
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     nombre: '',
     tipo: 'distribuidor' as 'distribuidor' | 'retailer' | 'consumidor-final',

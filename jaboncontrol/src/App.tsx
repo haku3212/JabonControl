@@ -76,34 +76,54 @@ function AppContent() {
     setShowNotification(true);
   };
 
-  const handleSaveVenta = (data: any) => {
-    addVenta(data);
-    setModalType(null);
-    showNotificationMsg('✅ Venta registrada correctamente');
+  const handleSaveVenta = async (data: any) => {
+    try {
+      await addVenta(data);
+      setModalType(null);
+      showNotificationMsg('✅ Venta registrada correctamente');
+    } catch (error) {
+      showNotificationMsg('❌ Error al guardar la venta');
+    }
   };
 
-  const handleSaveCliente = (data: any) => {
-    addCliente(data);
-    setModalType(null);
-    showNotificationMsg('✅ Cliente registrado correctamente');
+  const handleSaveCliente = async (data: any) => {
+    try {
+      await addCliente(data);
+      setModalType(null);
+      showNotificationMsg('✅ Cliente registrado correctamente');
+    } catch (error) {
+      showNotificationMsg('❌ Error al guardar el cliente');
+    }
   };
 
-  const handleSaveHornada = (data: any) => {
-    addHornada(data);
-    setModalType(null);
-    showNotificationMsg('✅ Hornada registrada correctamente');
+  const handleSaveHornada = async (data: any) => {
+    try {
+      await addHornada(data);
+      setModalType(null);
+      showNotificationMsg('✅ Hornada registrada correctamente');
+    } catch (error) {
+      showNotificationMsg('❌ Error al guardar la hornada');
+    }
   };
 
-  const handleSaveRecepcion = (data: any) => {
-    addRecepcion(data);
-    setModalType(null);
-    showNotificationMsg('✅ Recepción registrada correctamente');
+  const handleSaveRecepcion = async (data: any) => {
+    try {
+      await addRecepcion(data);
+      setModalType(null);
+      showNotificationMsg('✅ Recepción registrada correctamente');
+    } catch (error) {
+      showNotificationMsg('❌ Error al guardar la recepción');
+    }
   };
 
-  const handleSaveCobro = (data: any) => {
-    addCobro(data);
-    setModalType(null);
-    showNotificationMsg('✅ Cobro registrado correctamente');
+  const handleSaveCobro = async (data: any) => {
+    try {
+      await addCobro(data);
+      setModalType(null);
+      showNotificationMsg('✅ Cobro registrado correctamente');
+    } catch (error) {
+      showNotificationMsg('❌ Error al guardar el cobro');
+    }
   };
 
   const [title, breadcrumb] = panelTitles[activePanel] || ['Dashboard', 'INICIO / DASHBOARD'];

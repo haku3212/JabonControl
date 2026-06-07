@@ -3,7 +3,7 @@ import { useAppContext } from '../../context/AppContext';
 import QRCode from 'qrcode';
 
 interface CobroFormProps {
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<void>;
   onCancel: () => void;
 }
 

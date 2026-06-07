@@ -1,11 +1,12 @@
 import { useState } from 'react';
 
 interface RecepcionFormProps {
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<void>;
   onCancel: () => void;
 }
 
 export function RecepcionForm({ onSave, onCancel }: RecepcionFormProps) {
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     fecha: new Date().toISOString().split('T')[0],
     proveedor: '',
