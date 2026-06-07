@@ -20,6 +20,7 @@ import { ClienteForm } from './components/forms/ClienteForm';
 import { HornadaForm } from './components/forms/HornadaForm';
 import { RecepcionForm } from './components/forms/RecepcionForm';
 import { CobroForm } from './components/forms/CobroForm';
+import { Recibo } from './components/Recibo';
 
 const panelTitles: Record<string, [string, string]> = {
   dashboard: ['Dashboard', 'INICIO / DASHBOARD'],
@@ -50,6 +51,7 @@ function AppContent() {
   const [showNotification, setShowNotification] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [reciboData, setReciboData] = useState<any>(null);
   const { addVenta, addCliente, addHornada, addRecepcion, addCobro } = useAppContext();
 
   // Detectar tamaño de pantalla
@@ -130,7 +132,17 @@ function AppContent() {
     try {
       await addCobro(data);
       setModalType(null);
-      showNotificationMsg('✅ Cobro registrado correctamente');
+
+      // Generar número de recibo
+      const numeroRecibo = `RCP-${Date.now().toString().slice(-6)}`;
+
+      // Mostrar recibo
+      setReciboData({
+        ...data,
+        numeroRecibo,
+      });
+
+      showNotificationMsg('✅ Cobro registrado - Recibo generado');
     } catch (error) {
       showNotificationMsg('❌ Error al guardar el cobro');
     }
@@ -213,6 +225,35 @@ function AppContent() {
           <CobroForm onSave={handleSaveCobro} onCancel={() => setModalType(null)} />
         )}
       </Modal>
+
+      {/* Modal Recibo */}
+      {reciboData && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-dark-surface border border-dark-border rounded-lg w-full max-w-2xl my-8">
+            <div className="px-5 py-4 border-b border-dark-border flex items-center justify-between sticky top-0 bg-dark-surface z-10">
+              <h2 className="text-xl font-bebas text-text-primary tracking-wider">
+                Recibo de Pago
+              </h2>
+              <button
+                onClick={() => setReciboData(null)}
+                className="text-text-tertiary hover:text-text-primary text-xl w-8 h-8 flex items-center justify-center rounded hover:bg-dark-surface2 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto max-h-[calc(100vh-200px)]">
+              <Recibo
+                cliente={reciboData.cliente}
+                montoCobrado={reciboData.montoCobrado}
+                metodoPago={reciboData.metodoPago}
+                fecha={reciboData.fecha}
+                notasCorrespondientes={reciboData.notasCorrespondientes}
+                numeroRecibo={reciboData.numeroRecibo}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <Notification
         message={notification}
