@@ -1,15 +1,32 @@
-const Database = require('better-sqlite3');
+const initSqlJs = require('sql.js');
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
-const dbPath = process.env.DATABASE || './database.sqlite';
-const db = new Database(dbPath);
+const dbPath = process.env.DATABASE || './database.db';
+let db = null;
 
-function initDB() {
+async function initDB() {
   try {
-    // Tabla de Usuarios
-    db.exec(`
+    const SQL = await initSqlJs();
+
+    // Cargar DB existente o crear nueva
+    let data;
+    try {
+      data = fs.readFileSync(dbPath);
+    } catch (e) {
+      data = null;
+    }
+
+    if (data) {
+      db = new SQL.Database(data);
+    } else {
+      db = new SQL.Database();
+    }
+
+    // Crear tablas
+    db.run(`
       CREATE TABLE IF NOT EXISTS usuarios (
         id TEXT PRIMARY KEY,
         nombre TEXT NOT NULL,
@@ -23,8 +40,7 @@ function initDB() {
       )
     `);
 
-    // Tabla de Clientes
-    db.exec(`
+    db.run(`
       CREATE TABLE IF NOT EXISTS clientes (
         id TEXT PRIMARY KEY,
         nombre TEXT NOT NULL UNIQUE,
@@ -38,8 +54,7 @@ function initDB() {
       )
     `);
 
-    // Tabla de Ventas
-    db.exec(`
+    db.run(`
       CREATE TABLE IF NOT EXISTS ventas (
         id TEXT PRIMARY KEY,
         numeroNE TEXT UNIQUE NOT NULL,
@@ -56,8 +71,7 @@ function initDB() {
       )
     `);
 
-    // Tabla de Cobros
-    db.exec(`
+    db.run(`
       CREATE TABLE IF NOT EXISTS cobros (
         id TEXT PRIMARY KEY,
         fecha TEXT NOT NULL,
@@ -70,8 +84,7 @@ function initDB() {
       )
     `);
 
-    // Tabla de Hornadas
-    db.exec(`
+    db.run(`
       CREATE TABLE IF NOT EXISTS hornadas (
         id TEXT PRIMARY KEY,
         numero TEXT UNIQUE NOT NULL,
@@ -92,8 +105,7 @@ function initDB() {
       )
     `);
 
-    // Tabla de Materias Primas
-    db.exec(`
+    db.run(`
       CREATE TABLE IF NOT EXISTS materias_primas (
         id TEXT PRIMARY KEY,
         fecha TEXT NOT NULL,
@@ -108,8 +120,7 @@ function initDB() {
       )
     `);
 
-    // Tabla de Recepciones
-    db.exec(`
+    db.run(`
       CREATE TABLE IF NOT EXISTS recepciones (
         id TEXT PRIMARY KEY,
         fecha TEXT NOT NULL,
@@ -124,24 +135,39 @@ function initDB() {
       )
     `);
 
-    // Insertar usuario admin por defecto
-    const stmt = db.prepare("SELECT * FROM usuarios WHERE usuario = 'admin'");
-    const adminExists = stmt.get();
-
-    if (!adminExists) {
+    // Verificar si admin existe
+    const result = db.exec("SELECT * FROM usuarios WHERE usuario = 'admin'");
+    if (result.length === 0 || result[0].values.length === 0) {
       const hashedPass = bcrypt.hashSync('admin123', 10);
-      const insertStmt = db.prepare(
-        "INSERT INTO usuarios (id, nombre, usuario, password, rol) VALUES (?, ?, ?, ?, ?)"
+      db.run(
+        "INSERT INTO usuarios (id, nombre, usuario, password, rol) VALUES (?, ?, ?, ?, ?)",
+        [crypto.randomUUID(), 'Administrador', 'admin', hashedPass, 'admin']
       );
-      insertStmt.run(crypto.randomUUID(), 'Administrador', 'admin', hashedPass, 'admin');
       console.log('✅ Usuario admin creado');
     }
 
-    console.log('✅ Base de datos SQLite inicializada');
+    // Guardar DB
+    saveDB();
+    console.log('✅ Base de datos SQL.js inicializada');
   } catch (error) {
     console.error('❌ Error inicializando base de datos:', error);
   }
 }
 
+function saveDB() {
+  if (db) {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, buffer);
+  }
+}
+
+function getDB() {
+  return db;
+}
+
 module.exports = initDB;
-module.exports.db = db;
+module.exports.db = {
+  get: () => db,
+  save: saveDB
+};

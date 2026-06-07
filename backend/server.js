@@ -18,9 +18,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Inicializar base de datos
-initDB();
-
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -41,8 +38,20 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`✅ JabonControl API corriendo en puerto ${PORT}`);
-  console.log(`📡 http://localhost:${PORT}`);
-});
+// Inicializar y arrancar
+async function start() {
+  try {
+    await initDB();
+
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+      console.log(`✅ JabonControl API corriendo en puerto ${PORT}`);
+      console.log(`📡 http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error('❌ Error iniciando servidor:', error);
+    process.exit(1);
+  }
+}
+
+start();

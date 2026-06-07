@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { db } = require('../db');
+const dbModule = require('../db');
 const { v4: uuid } = require('uuid');
 
 // Login
@@ -14,8 +14,18 @@ router.post('/login', (req, res) => {
       return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
     }
 
-    const stmt = db.prepare('SELECT * FROM usuarios WHERE usuario = ?');
-    const user = stmt.get(usuario);
+    const db = dbModule.db.get();
+    const result = db.exec('SELECT * FROM usuarios WHERE usuario = ?', [usuario]);
+
+    let user = null;
+    if (result.length > 0 && result[0].values.length > 0) {
+      const row = result[0].values[0];
+      const columns = result[0].columns;
+      user = {};
+      columns.forEach((col, idx) => {
+        user[col] = row[idx];
+      });
+    }
 
     if (!user) {
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
@@ -27,8 +37,8 @@ router.post('/login', (req, res) => {
     }
 
     // Actualizar último acceso
-    const updateStmt = db.prepare('UPDATE usuarios SET ultimo_acceso = CURRENT_TIMESTAMP WHERE id = ?');
-    updateStmt.run(user.id);
+    db.run('UPDATE usuarios SET ultimo_acceso = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+    dbModule.db.save();
 
     const token = jwt.sign(
       { id: user.id, usuario: user.usuario, rol: user.rol, nombre: user.nombre },
@@ -65,11 +75,13 @@ router.post('/register', verifyToken, (req, res) => {
 
     const hashedPassword = bcrypt.hashSync(password, 10);
     const id = uuid();
+    const db = dbModule.db.get();
 
-    const stmt = db.prepare(
-      'INSERT INTO usuarios (id, nombre, usuario, password, rol) VALUES (?, ?, ?, ?, ?)'
+    db.run(
+      'INSERT INTO usuarios (id, nombre, usuario, password, rol) VALUES (?, ?, ?, ?, ?)',
+      [id, nombre, usuario, hashedPassword, rol || 'operario']
     );
-    stmt.run(id, nombre, usuario, hashedPassword, rol || 'operario');
+    dbModule.db.save();
 
     res.json({ message: 'Usuario creado', id });
   } catch (error) {

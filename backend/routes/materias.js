@@ -1,12 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../db');
+const dbModule = require('../db');
 const { v4: uuid } = require('uuid');
+
+function rowsToObjects(result) {
+  if (result.length === 0) return [];
+  const columns = result[0].columns;
+  return result[0].values.map(row => {
+    const obj = {};
+    columns.forEach((col, idx) => {
+      obj[col] = row[idx];
+    });
+    return obj;
+  });
+}
 
 router.get('/', (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM recepciones ORDER BY fecha DESC');
-    const rows = stmt.all();
+    const db = dbModule.db.get();
+    const result = db.exec('SELECT * FROM recepciones ORDER BY fecha DESC');
+    const rows = rowsToObjects(result);
     res.json(rows || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -22,12 +35,14 @@ router.post('/', (req, res) => {
     }
 
     const id = uuid();
-    const stmt = db.prepare(
+    const db = dbModule.db.get();
+    db.run(
       `INSERT INTO recepciones
        (id, fecha, proveedor, producto, cantidad, unidad, precioUnitario, precioTotal, estado)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, fecha || new Date().toISOString().split('T')[0], proveedor, producto, cantidad, unidad, precioUnitario, precioTotal, estado || 'recibido']
     );
-    stmt.run(id, fecha || new Date().toISOString().split('T')[0], proveedor, producto, cantidad, unidad, precioUnitario, precioTotal, estado || 'recibido');
+    dbModule.db.save();
 
     res.status(201).json({ id, message: 'Recepción registrada' });
   } catch (error) {
@@ -37,8 +52,9 @@ router.post('/', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
-    const stmt = db.prepare('DELETE FROM recepciones WHERE id = ?');
-    stmt.run(req.params.id);
+    const db = dbModule.db.get();
+    db.run('DELETE FROM recepciones WHERE id = ?', [req.params.id]);
+    dbModule.db.save();
     res.json({ message: 'Recepción eliminada' });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -1,13 +1,37 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../db');
+const dbModule = require('../db');
 const { v4: uuid } = require('uuid');
+
+function rowToObject(result) {
+  if (result.length === 0 || result[0].values.length === 0) return null;
+  const row = result[0].values[0];
+  const columns = result[0].columns;
+  const obj = {};
+  columns.forEach((col, idx) => {
+    obj[col] = row[idx];
+  });
+  return obj;
+}
+
+function rowsToObjects(result) {
+  if (result.length === 0) return [];
+  const columns = result[0].columns;
+  return result[0].values.map(row => {
+    const obj = {};
+    columns.forEach((col, idx) => {
+      obj[col] = row[idx];
+    });
+    return obj;
+  });
+}
 
 // GET todas las ventas
 router.get('/', (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM ventas ORDER BY fecha DESC');
-    const rows = stmt.all();
+    const db = dbModule.db.get();
+    const result = db.exec('SELECT * FROM ventas ORDER BY fecha DESC');
+    const rows = rowsToObjects(result);
     res.json(rows || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -17,8 +41,9 @@ router.get('/', (req, res) => {
 // GET venta por ID
 router.get('/:id', (req, res) => {
   try {
-    const stmt = db.prepare('SELECT * FROM ventas WHERE id = ?');
-    const row = stmt.get(req.params.id);
+    const db = dbModule.db.get();
+    const result = db.exec('SELECT * FROM ventas WHERE id = ?', [req.params.id]);
+    const row = rowToObject(result);
     if (!row) return res.status(404).json({ error: 'No encontrada' });
     res.json(row);
   } catch (error) {
@@ -36,11 +61,13 @@ router.post('/', (req, res) => {
     }
 
     const id = uuid();
-    const stmt = db.prepare(
+    const db = dbModule.db.get();
+    db.run(
       `INSERT INTO ventas (id, numeroNE, fecha, cliente, formato, cantidad, precioUnitario, total, tipoPago)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, numeroNE, fecha || new Date().toISOString().split('T')[0], cliente, formato, cantidad, precioUnitario, total, tipoPago]
     );
-    stmt.run(id, numeroNE, fecha || new Date().toISOString().split('T')[0], cliente, formato, cantidad, precioUnitario, total, tipoPago);
+    dbModule.db.save();
 
     res.status(201).json({ id, message: 'Venta creada' });
   } catch (error) {
@@ -52,8 +79,9 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const { estado } = req.body;
-    const stmt = db.prepare('UPDATE ventas SET estado = ? WHERE id = ?');
-    stmt.run(estado, req.params.id);
+    const db = dbModule.db.get();
+    db.run('UPDATE ventas SET estado = ? WHERE id = ?', [estado, req.params.id]);
+    dbModule.db.save();
     res.json({ message: 'Venta actualizada' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -63,8 +91,9 @@ router.put('/:id', (req, res) => {
 // DELETE venta
 router.delete('/:id', (req, res) => {
   try {
-    const stmt = db.prepare('DELETE FROM ventas WHERE id = ?');
-    stmt.run(req.params.id);
+    const db = dbModule.db.get();
+    db.run('DELETE FROM ventas WHERE id = ?', [req.params.id]);
+    dbModule.db.save();
     res.json({ message: 'Venta eliminada' });
   } catch (error) {
     res.status(500).json({ error: error.message });
