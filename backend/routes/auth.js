@@ -7,14 +7,15 @@ const { v4: uuid } = require('uuid');
 
 // Login
 router.post('/login', (req, res) => {
-  const { usuario, password } = req.body;
+  try {
+    const { usuario, password } = req.body;
 
-  if (!usuario || !password) {
-    return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
-  }
+    if (!usuario || !password) {
+      return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
+    }
 
-  db.get('SELECT * FROM usuarios WHERE usuario = ?', [usuario], (err, user) => {
-    if (err) return res.status(500).json({ error: err.message });
+    const stmt = db.prepare('SELECT * FROM usuarios WHERE usuario = ?');
+    const user = stmt.get(usuario);
 
     if (!user) {
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
@@ -26,7 +27,8 @@ router.post('/login', (req, res) => {
     }
 
     // Actualizar último acceso
-    db.run('UPDATE usuarios SET ultimo_acceso = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+    const updateStmt = db.prepare('UPDATE usuarios SET ultimo_acceso = CURRENT_TIMESTAMP WHERE id = ?');
+    updateStmt.run(user.id);
 
     const token = jwt.sign(
       { id: user.id, usuario: user.usuario, rol: user.rol, nombre: user.nombre },
@@ -43,34 +45,39 @@ router.post('/login', (req, res) => {
         rol: user.rol
       }
     });
-  });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Registrar usuario (solo admin)
 router.post('/register', verifyToken, (req, res) => {
-  if (req.user.rol !== 'admin') {
-    return res.status(403).json({ error: 'No autorizado' });
-  }
-
-  const { nombre, usuario, password, rol } = req.body;
-
-  if (!nombre || !usuario || !password) {
-    return res.status(400).json({ error: 'Campos requeridos' });
-  }
-
-  const hashedPassword = bcrypt.hashSync(password, 10);
-  const id = uuid();
-
-  db.run(
-    'INSERT INTO usuarios (id, nombre, usuario, password, rol) VALUES (?, ?, ?, ?, ?)',
-    [id, nombre, usuario, hashedPassword, rol || 'operario'],
-    (err) => {
-      if (err) {
-        return res.status(400).json({ error: 'El usuario ya existe' });
-      }
-      res.json({ message: 'Usuario creado', id });
+  try {
+    if (req.user.rol !== 'admin') {
+      return res.status(403).json({ error: 'No autorizado' });
     }
-  );
+
+    const { nombre, usuario, password, rol } = req.body;
+
+    if (!nombre || !usuario || !password) {
+      return res.status(400).json({ error: 'Campos requeridos' });
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const id = uuid();
+
+    const stmt = db.prepare(
+      'INSERT INTO usuarios (id, nombre, usuario, password, rol) VALUES (?, ?, ?, ?, ?)'
+    );
+    stmt.run(id, nombre, usuario, hashedPassword, rol || 'operario');
+
+    res.json({ message: 'Usuario creado', id });
+  } catch (error) {
+    if (error.message.includes('UNIQUE')) {
+      return res.status(400).json({ error: 'El usuario ya existe' });
+    }
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Verificar token
