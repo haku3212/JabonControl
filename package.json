@@ -1,0 +1,13 @@
+{
+  "name": "jaboncontrol",
+  "version": "1.0.0",
+  "description": "ERP para Jabonería",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "cd backend && npm install && node server.js",
+    "dev": "cd backend && npm install && node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
