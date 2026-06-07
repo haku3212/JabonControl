@@ -39,8 +39,8 @@ export function ClienteForm({ onSave, onCancel }: ClienteFormProps) {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-4">
+        <div className="col-span-1 sm:col-span-2">
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Nombre / Razón Social *</label>
           <input
             type="text"
@@ -92,7 +92,7 @@ export function ClienteForm({ onSave, onCancel }: ClienteFormProps) {
             className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
           />
         </div>
-        <div className="col-span-2">
+        <div className="col-span-1 sm:col-span-2">
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Dirección *</label>
           <textarea
             value={form.direccion}

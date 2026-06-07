@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -48,7 +48,17 @@ function AppContent() {
   const [modalType, setModalType] = useState<string | null>(null);
   const [notification, setNotification] = useState('');
   const [showNotification, setShowNotification] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { addVenta, addCliente, addHornada, addRecepcion, addCobro } = useAppContext();
+
+  // Detectar tamaño de pantalla
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleNavigate = (panel: string) => {
     setActivePanel(panel);
@@ -143,11 +153,38 @@ function AppContent() {
   };
 
   return (
-    <div className="flex h-screen bg-dark-bg">
-      <Sidebar activePanel={activePanel} onNavigate={handleNavigate} />
+    <div className="flex h-screen bg-dark-bg flex-col md:flex-row">
+      {/* Sidebar - Mobile overlay */}
+      {isMobile && sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Topbar title={title} breadcrumb={breadcrumb} onNewClick={handleNewClick} />
+      <div
+        className={`${
+          isMobile
+            ? `fixed top-0 left-0 h-screen z-40 transform transition-transform ${
+                sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+              }`
+            : 'static'
+        } w-56 md:w-56`}
+      >
+        <Sidebar activePanel={activePanel} onNavigate={(panel) => {
+          handleNavigate(panel);
+          if (isMobile) setSidebarOpen(false);
+        }} />
+      </div>
+
+      <div className="flex flex-col flex-1 overflow-hidden w-full">
+        <Topbar
+          title={title}
+          breadcrumb={breadcrumb}
+          onNewClick={handleNewClick}
+          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+          isMobile={isMobile}
+        />
 
         <main className="flex-1 overflow-y-auto p-6">
           {panelComponents[activePanel] || <Dashboard />}

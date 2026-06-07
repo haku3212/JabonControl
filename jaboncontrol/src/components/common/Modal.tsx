@@ -17,22 +17,22 @@ export function Modal({ isOpen, title, children, onClose, hideFooter = true, onS
       className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-dark-surface border border-dark-border rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto fade-in">
+      <div className="bg-dark-surface border border-dark-border rounded-lg w-full max-w-2xl md:max-w-3xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto fade-in mx-2 md:mx-0">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-dark-border flex items-center justify-between sticky top-0 bg-dark-surface z-10">
-          <div className="text-xl font-bebas text-text-primary tracking-wider">
+        <div className="px-4 md:px-5 py-3 md:py-4 border-b border-dark-border flex items-center justify-between sticky top-0 bg-dark-surface z-10">
+          <div className="text-lg md:text-xl font-bebas text-text-primary tracking-wider truncate">
             {title}
           </div>
           <button
             onClick={onClose}
-            className="text-text-tertiary hover:text-text-primary text-xl w-8 h-8 flex items-center justify-center rounded hover:bg-dark-surface2 transition-colors"
+            className="text-text-tertiary hover:text-text-primary text-xl w-8 h-8 flex items-center justify-center rounded hover:bg-dark-surface2 transition-colors flex-shrink-0"
           >
             ✕
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-5">
+        <div className="p-4 md:p-5">
           {children}
         </div>
 

@@ -56,8 +56,8 @@ export function DocumentoForm({ onSave, onCancel }: DocumentoFormProps) {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-4">
+        <div className="col-span-1 sm:col-span-2">
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Nombre del Documento *</label>
           <input
             type="text"
@@ -91,7 +91,7 @@ export function DocumentoForm({ onSave, onCancel }: DocumentoFormProps) {
           />
         </div>
 
-        <div className="col-span-2">
+        <div className="col-span-1 sm:col-span-2">
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Descripción (opcional)</label>
           <textarea
             value={form.descripcion}
@@ -102,7 +102,7 @@ export function DocumentoForm({ onSave, onCancel }: DocumentoFormProps) {
           />
         </div>
 
-        <div className="col-span-2">
+        <div className="col-span-1 sm:col-span-2">
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Archivo *</label>
           <div className="relative">
             <input

@@ -149,7 +149,7 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
 
       {/* Formulario de pago */}
       {clienteSeleccionado && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
           <div>
             <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">
               Monto a Pagar (Bs) *
@@ -177,7 +177,7 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
               <option value="qr">📱 QR Banco</option>
             </select>
           </div>
-          <div className="col-span-2">
+          <div className="col-span-1 sm:col-span-2">
             <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">
               Fecha del Cobro
             </label>

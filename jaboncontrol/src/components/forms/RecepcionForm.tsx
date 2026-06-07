@@ -42,7 +42,7 @@ export function RecepcionForm({ onSave, onCancel }: RecepcionFormProps) {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-4">
         <div>
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Fecha</label>
           <input

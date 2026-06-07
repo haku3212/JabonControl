@@ -183,7 +183,7 @@ export function HornadaForm({ onSave, onCancel }: HornadaFormProps) {
               className="w-full bg-dark-surface border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
             />
           </div>
-          <div className="col-span-2">
+          <div className="col-span-1 sm:col-span-2">
             <label className="text-xs font-mono text-text-tertiary block mb-1">Producción Total (kg) *</label>
             <input
               type="number"
