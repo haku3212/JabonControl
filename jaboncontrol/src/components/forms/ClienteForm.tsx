@@ -17,15 +17,24 @@ export function ClienteForm({ onSave, onCancel }: ClienteFormProps) {
     cobradoMes: 0,
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.nombre || !form.telefono || !form.direccion) {
       alert('Por favor complete todos los campos obligatorios');
       return;
     }
-    onSave({
-      ...form,
-      id: Date.now().toString(),
-    });
+
+    setLoading(true);
+    try {
+      await onSave({
+        ...form,
+        id: Date.now().toString(),
+      });
+    } catch (error) {
+      alert('Error al guardar el cliente');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -97,15 +106,17 @@ export function ClienteForm({ onSave, onCancel }: ClienteFormProps) {
       <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-dark-border">
         <button
           onClick={onCancel}
-          className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow"
+          disabled={loading}
+          className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow disabled:opacity-50"
         >
           Cancelar
         </button>
         <button
           onClick={handleSubmit}
-          className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90"
+          disabled={loading}
+          className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90 disabled:opacity-50"
         >
-          💾 Guardar Cliente
+          {loading ? '⏳ Guardando...' : '💾 Guardar Cliente'}
         </button>
       </div>
     </div>

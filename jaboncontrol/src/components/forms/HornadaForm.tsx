@@ -23,7 +23,7 @@ export function HornadaForm({ onSave, onCancel }: HornadaFormProps) {
     observaciones: '',
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (form.produccionTotal <= 0) {
       alert('Por favor ingrese la producción total');
       return;
@@ -32,25 +32,33 @@ export function HornadaForm({ onSave, onCancel }: HornadaFormProps) {
     const totalAceites = form.aceiteQuem + form.aceiteCrudo + form.aceiteAlmendra;
     const rendimiento = totalAceites > 0 ? (form.produccionTotal / totalAceites) * 100 : 0;
 
-    onSave({
-      id: Date.now().toString(),
-      numero: form.numero,
-      fecha: form.fecha,
-      horaInicio: form.horaInicio,
-      operario: form.operario,
-      ingredientes: {
-        naohVolumen: form.naohVolumen,
-        seboFund: form.seboFund,
-        aceiteQuem: form.aceiteQuem,
-        aceiteCrudo: form.aceiteCrudo,
-        aceiteAlmendra: form.aceiteAlmendra,
-        agua: form.agua,
-        jabonRecicl: form.jabonRecicl,
-      },
-      produccionTotal: form.produccionTotal,
-      rendimiento: Math.min(rendimiento, 100),
-      observaciones: form.observaciones,
-    });
+    setLoading(true);
+    try {
+      await onSave({
+        id: Date.now().toString(),
+        numero: form.numero,
+        fecha: form.fecha,
+        horaInicio: form.horaInicio,
+        operario: form.operario,
+        ingredientes: {
+          naohVolumen: form.naohVolumen,
+          seboFund: form.seboFund,
+          aceiteQuem: form.aceiteQuem,
+          aceiteCrudo: form.aceiteCrudo,
+          aceiteAlmendra: form.aceiteAlmendra,
+          agua: form.agua,
+          jabonRecicl: form.jabonRecicl,
+        },
+        produccionTotal: form.produccionTotal,
+        rendimiento: Math.min(rendimiento, 100),
+        observaciones: form.observaciones,
+      });
+    } catch (error) {
+      alert('Error al guardar la hornada');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -201,15 +209,17 @@ export function HornadaForm({ onSave, onCancel }: HornadaFormProps) {
       <div className="flex justify-end gap-2 pt-4 border-t border-dark-border">
         <button
           onClick={onCancel}
-          className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow"
+          disabled={loading}
+          className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow disabled:opacity-50"
         >
           Cancelar
         </button>
         <button
           onClick={handleSubmit}
-          className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90"
+          disabled={loading}
+          className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90 disabled:opacity-50"
         >
-          💾 Guardar Hornada
+          {loading ? '⏳ Guardando...' : '💾 Guardar Hornada'}
         </button>
       </div>
     </div>

@@ -13,6 +13,7 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
   const [monto, setMonto] = useState(0);
   const [metodoPago, setMetodoPago] = useState('efectivo');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
 
   // Generar datos del QR cuando cambian monto o cliente
@@ -69,26 +70,34 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
   const totalAplicado = distribucion.reduce((s, d) => s + d.aplicado, 0);
   const excedente = Math.round((monto - totalAplicado) * 100) / 100;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!clienteSeleccionado || monto <= 0) {
       alert('Por favor seleccione cliente e ingrese monto');
       return;
     }
 
-    const deudas = distribucion
-      .filter((d) => d.aplicado > 0)
-      .map((d) => d.numeroNE)
-      .join(', ');
+    setLoading(true);
+    try {
+      const deudas = distribucion
+        .filter((d) => d.aplicado > 0)
+        .map((d) => d.numeroNE)
+        .join(', ');
 
-    onSave({
-      id: Date.now().toString(),
-      fecha,
-      cliente: clienteSeleccionado,
-      montoCobrado: monto,
-      metodoPago,
-      notasCorrespondientes: deudas,
-      distribucion: distribucion.filter((d) => d.aplicado > 0),
-    });
+      await onSave({
+        id: Date.now().toString(),
+        fecha,
+        cliente: clienteSeleccionado,
+        montoCobrado: monto,
+        metodoPago,
+        notasCorrespondientes: deudas,
+        distribucion: distribucion.filter((d) => d.aplicado > 0),
+      });
+    } catch (error) {
+      alert('Error al guardar el cobro');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -269,16 +278,17 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
       <div className="flex justify-end gap-2 pt-4 border-t border-dark-border">
         <button
           onClick={onCancel}
-          className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow"
+          disabled={loading}
+          className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow disabled:opacity-50"
         >
           Cancelar
         </button>
         <button
           onClick={handleSubmit}
-          disabled={!clienteSeleccionado || monto <= 0}
+          disabled={!clienteSeleccionado || monto <= 0 || loading}
           className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          ✓ Confirmar Cobro
+          {loading ? '⏳ Guardando...' : '✓ Confirmar Cobro'}
         </button>
       </div>
     </div>
