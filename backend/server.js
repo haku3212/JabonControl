@@ -36,19 +36,19 @@ app.use('/api/hornadas', hornadasRoutes);
 app.use('/api/materias', materiasRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: err.message });
-});
-
 // Fallback para React Router - servir index.html para rutas no API
-app.get('*', (req, res) => {
+app.use((req, res, next) => {
   if (!req.path.startsWith('/api')) {
     res.sendFile(path.join(__dirname, 'public/index.html'));
   } else {
     res.status(404).json({ error: 'API endpoint not found' });
   }
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: err.message });
 });
 
 // Inicializar y arrancar
