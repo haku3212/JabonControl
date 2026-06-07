@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import {
   Recepcion,
   Hornada,
@@ -8,6 +8,7 @@ import {
   Proyecto,
   Stock,
 } from '../types';
+import { ventasService, clientesService, hornadasService, cobrosService, materiasService } from '../services/api';
 
 interface AppContextType {
   // Data
@@ -159,54 +160,132 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [stocks] = useState<Stock[]>([]);
 
-  const addRecepcion = (data: Recepcion) => {
-    setRecepciones([...recepciones, { ...data, id: Date.now().toString() }]);
-  };
+  // Cargar datos del API al montar
+  useEffect(() => {
+    const cargarDatos = async () => {
+      try {
+        const [ventasData, clientesData, hornadasData, cobrosData, materiasData] = await Promise.allSettled([
+          ventasService.listar(),
+          clientesService.listar(),
+          hornadasService.listar(),
+          cobrosService.listar(),
+          materiasService.listar(),
+        ]);
 
-  const addHornada = (data: Hornada) => {
-    setHornadas([...hornadas, { ...data, id: Date.now().toString() }]);
-  };
+        // Si la API responde exitosamente, actualizar los datos
+        if (ventasData.status === 'fulfilled') setVentas(ventasData.value);
+        if (clientesData.status === 'fulfilled') setClientes(clientesData.value);
+        if (hornadasData.status === 'fulfilled') setHornadas(hornadasData.value);
+        if (cobrosData.status === 'fulfilled') setCobros(cobrosData.value);
+        if (materiasData.status === 'fulfilled') setRecepciones(materiasData.value);
 
-  const addVenta = (data: Venta) => {
-    // Si el cliente de la venta no existe, agregarlo automáticamente
-    const clienteExiste = clientes.some(c => c.nombre === data.cliente);
-    if (!clienteExiste && data.cliente) {
-      setClientes([...clientes, {
-        id: Date.now().toString(),
-        nombre: data.cliente,
-        tipo: 'distribuidor',
-        telefono: '',
-        ciudad: '',
-        direccion: '',
-        ventaMes: data.total || 0,
-        cobradoMes: 0,
-      }]);
+        console.log('✅ Datos cargados desde el API');
+      } catch (error) {
+        console.log('⚠️ Usando datos mock - No se puede conectar al API:', error);
+        // Mantener los datos iniciales si falla
+      }
+    };
+
+    cargarDatos();
+  }, []);
+
+  const addRecepcion = async (data: Recepcion) => {
+    try {
+      const newData = await materiasService.crear(data);
+      setRecepciones([...recepciones, newData]);
+    } catch (error) {
+      console.log('⚠️ Agregando a datos locales:', error);
+      setRecepciones([...recepciones, { ...data, id: Date.now().toString() }]);
     }
-    setVentas([...ventas, { ...data, id: Date.now().toString() }]);
   };
 
-  const addCobro = (data: Cobro) => {
-    setCobros([...cobros, { ...data, id: Date.now().toString() }]);
+  const addHornada = async (data: Hornada) => {
+    try {
+      const newData = await hornadasService.crear(data);
+      setHornadas([...hornadas, newData]);
+    } catch (error) {
+      console.log('⚠️ Agregando a datos locales:', error);
+      setHornadas([...hornadas, { ...data, id: Date.now().toString() }]);
+    }
   };
 
-  const addCliente = (data: Cliente) => {
-    setClientes([...clientes, { ...data, id: Date.now().toString() }]);
+  const addVenta = async (data: Venta) => {
+    try {
+      const newData = await ventasService.crear(data);
+      setVentas([...ventas, newData]);
+
+      // Si el cliente de la venta no existe, agregarlo automáticamente
+      const clienteExiste = clientes.some(c => c.nombre === data.cliente);
+      if (!clienteExiste && data.cliente) {
+        const newCliente = {
+          nombre: data.cliente,
+          tipo: 'distribuidor',
+          telefono: '',
+          ciudad: '',
+          direccion: '',
+        };
+        await clientesService.crear(newCliente);
+        const createdCliente = await clientesService.crear(newCliente);
+        setClientes([...clientes, createdCliente]);
+      }
+    } catch (error) {
+      console.log('⚠️ Agregando a datos locales:', error);
+      setVentas([...ventas, { ...data, id: Date.now().toString() }]);
+    }
+  };
+
+  const addCobro = async (data: Cobro) => {
+    try {
+      const newData = await cobrosService.crear(data);
+      setCobros([...cobros, newData]);
+    } catch (error) {
+      console.log('⚠️ Agregando a datos locales:', error);
+      setCobros([...cobros, { ...data, id: Date.now().toString() }]);
+    }
+  };
+
+  const addCliente = async (data: Cliente) => {
+    try {
+      const newData = await clientesService.crear(data);
+      setClientes([...clientes, newData]);
+    } catch (error) {
+      console.log('⚠️ Agregando a datos locales:', error);
+      setClientes([...clientes, { ...data, id: Date.now().toString() }]);
+    }
   };
 
   const addProyecto = (data: Proyecto) => {
     setProyectos([...proyectos, { ...data, id: Date.now().toString() }]);
   };
 
-  const deleteRecepcion = (id: string) => {
-    setRecepciones(recepciones.filter((r) => r.id !== id));
+  const deleteRecepcion = async (id: string) => {
+    try {
+      await materiasService.eliminar(id);
+      setRecepciones(recepciones.filter((r) => r.id !== id));
+    } catch (error) {
+      console.log('⚠️ Eliminando de datos locales:', error);
+      setRecepciones(recepciones.filter((r) => r.id !== id));
+    }
   };
 
-  const deleteHornada = (id: string) => {
-    setHornadas(hornadas.filter((h) => h.id !== id));
+  const deleteHornada = async (id: string) => {
+    try {
+      await hornadasService.eliminar(id);
+      setHornadas(hornadas.filter((h) => h.id !== id));
+    } catch (error) {
+      console.log('⚠️ Eliminando de datos locales:', error);
+      setHornadas(hornadas.filter((h) => h.id !== id));
+    }
   };
 
-  const deleteVenta = (id: string) => {
-    setVentas(ventas.filter((v) => v.id !== id));
+  const deleteVenta = async (id: string) => {
+    try {
+      await ventasService.eliminar(id);
+      setVentas(ventas.filter((v) => v.id !== id));
+    } catch (error) {
+      console.log('⚠️ Eliminando de datos locales:', error);
+      setVentas(ventas.filter((v) => v.id !== id));
+    }
   };
 
   const kpis = {
