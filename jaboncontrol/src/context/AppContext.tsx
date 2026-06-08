@@ -190,67 +190,88 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addRecepcion = async (data: Recepcion) => {
+    // Agregar localmente primero
+    const dataConId = { ...data, id: data.id || Date.now().toString() };
+    setRecepciones([...recepciones, dataConId]);
+
+    // Luego guardar en API en background
     try {
-      const newData = await materiasService.crear(data);
-      setRecepciones([...recepciones, newData]);
+      await materiasService.crear(data);
     } catch (error) {
-      console.log('⚠️ Agregando a datos locales:', error);
-      setRecepciones([...recepciones, { ...data, id: Date.now().toString() }]);
+      console.log('⚠️ Error al guardar en API:', error);
     }
   };
 
   const addHornada = async (data: Hornada) => {
+    // Agregar localmente primero
+    const dataConId = { ...data, id: data.id || Date.now().toString() };
+    setHornadas([...hornadas, dataConId]);
+
+    // Luego guardar en API en background
     try {
-      const newData = await hornadasService.crear(data);
-      setHornadas([...hornadas, newData]);
+      await hornadasService.crear(data);
     } catch (error) {
-      console.log('⚠️ Agregando a datos locales:', error);
-      setHornadas([...hornadas, { ...data, id: Date.now().toString() }]);
+      console.log('⚠️ Error al guardar en API:', error);
     }
   };
 
   const addVenta = async (data: Venta) => {
-    try {
-      const newData = await ventasService.crear(data);
-      setVentas([...ventas, newData]);
+    // Agregar localmente primero
+    const dataConId = { ...data, id: data.id || Date.now().toString() };
+    setVentas([...ventas, dataConId]);
 
-      // Si el cliente de la venta no existe, agregarlo automáticamente
-      const clienteExiste = clientes.some(c => c.nombre === data.cliente);
-      if (!clienteExiste && data.cliente) {
-        const newCliente = {
-          nombre: data.cliente,
-          tipo: 'distribuidor',
-          telefono: '',
-          ciudad: '',
-          direccion: '',
-        };
-        await clientesService.crear(newCliente);
-        const createdCliente = await clientesService.crear(newCliente);
-        setClientes([...clientes, createdCliente]);
-      }
+    // Si el cliente de la venta no existe, agregarlo automáticamente
+    const clienteExiste = clientes.some(c => c.nombre === data.cliente);
+    if (!clienteExiste && data.cliente) {
+      const newCliente = {
+        id: Date.now().toString(),
+        nombre: data.cliente,
+        tipo: 'distribuidor',
+        telefono: '',
+        ciudad: '',
+        direccion: '',
+        ventaMes: data.total || 0,
+        cobradoMes: 0,
+      };
+      setClientes([...clientes, newCliente]);
+
+      // Guardar cliente en API en background
+      clientesService.crear(newCliente).catch(err =>
+        console.log('⚠️ Error al guardar cliente:', err)
+      );
+    }
+
+    // Luego guardar venta en API en background
+    try {
+      await ventasService.crear(data);
     } catch (error) {
-      console.log('⚠️ Agregando a datos locales:', error);
-      setVentas([...ventas, { ...data, id: Date.now().toString() }]);
+      console.log('⚠️ Error al guardar en API:', error);
     }
   };
 
   const addCobro = async (data: Cobro) => {
+    // Agregar localmente primero (respuesta inmediata)
+    const dataConId = { ...data, id: data.id || Date.now().toString() };
+    setCobros([...cobros, dataConId]);
+
+    // Luego intentar guardar en API en background
     try {
-      const newData = await cobrosService.crear(data);
-      setCobros([...cobros, newData]);
+      await cobrosService.crear(data);
     } catch (error) {
-      console.log('⚠️ Agregando a datos locales:', error);
-      setCobros([...cobros, { ...data, id: Date.now().toString() }]);
+      console.log('⚠️ Error al guardar en API, usando datos locales:', error);
     }
   };
 
   const addCliente = async (data: Cliente) => {
+    // Agregar localmente primero
+    const dataConId = { ...data, id: data.id || Date.now().toString() };
+    setClientes([...clientes, dataConId]);
+
+    // Luego guardar en API en background
     try {
-      const newData = await clientesService.crear(data);
-      setClientes([...clientes, newData]);
+      await clientesService.crear(data);
     } catch (error) {
-      console.log('⚠️ Agregando a datos locales:', error);
-      setClientes([...clientes, { ...data, id: Date.now().toString() }]);
+      console.log('⚠️ Error al guardar cliente en API:', error);
     }
   };
 
