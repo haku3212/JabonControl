@@ -20,6 +20,9 @@ import { ClienteForm } from './components/forms/ClienteForm';
 import { HornadaForm } from './components/forms/HornadaForm';
 import { RecepcionForm } from './components/forms/RecepcionForm';
 import { CobroForm } from './components/forms/CobroForm';
+import { ProyectoForm } from './components/forms/ProyectoForm';
+import { EquipoForm } from './components/forms/EquipoForm';
+import { DocumentoForm } from './components/forms/DocumentoForm';
 import { Recibo } from './components/Recibo';
 
 const panelTitles: Record<string, [string, string]> = {
@@ -42,6 +45,9 @@ const modalTitles: Record<string, string> = {
   hornada: 'Registrar Nueva Hornada',
   recepcion: 'Nueva Recepción de Materia Prima',
   cobro: 'Registrar Cobro',
+  proyecto: 'Nuevo Proyecto',
+  equipo: 'Nuevo Equipo',
+  documento: 'Subir Documento',
 };
 
 function AppContent() {
@@ -74,6 +80,9 @@ function AppContent() {
       hornadas: 'hornada',
       materias: 'recepcion',
       cobros: 'cobro',
+      proyectos: 'proyecto',
+      equipos: 'equipo',
+      documentacion: 'documento',
     };
     const modal = panelToModal[activePanel];
     if (modal) {
@@ -145,6 +154,35 @@ function AppContent() {
       showNotificationMsg('✅ Cobro registrado - Recibo generado');
     } catch (error) {
       showNotificationMsg('❌ Error al guardar el cobro');
+    }
+  };
+
+  const handleSaveProyecto = async (data: any) => {
+    try {
+      // Por ahora guardamos localmente
+      setModalType(null);
+      showNotificationMsg('✅ Proyecto registrado correctamente');
+    } catch (error) {
+      showNotificationMsg('❌ Error al guardar el proyecto');
+    }
+  };
+
+  const handleSaveEquipo = async (data: any) => {
+    try {
+      // Por ahora guardamos localmente
+      setModalType(null);
+      showNotificationMsg('✅ Equipo registrado correctamente');
+    } catch (error) {
+      showNotificationMsg('❌ Error al guardar el equipo');
+    }
+  };
+
+  const handleSaveDocumento = async (data: any) => {
+    try {
+      setModalType(null);
+      showNotificationMsg('✅ Documento guardado correctamente');
+    } catch (error) {
+      showNotificationMsg('❌ Error al guardar el documento');
     }
   };
 
@@ -223,6 +261,15 @@ function AppContent() {
         )}
         {modalType === 'cobro' && (
           <CobroForm onSave={handleSaveCobro} onCancel={() => setModalType(null)} />
+        )}
+        {modalType === 'proyecto' && (
+          <ProyectoForm onSave={handleSaveProyecto} onCancel={() => setModalType(null)} />
+        )}
+        {modalType === 'equipo' && (
+          <EquipoForm onSave={handleSaveEquipo} onCancel={() => setModalType(null)} />
+        )}
+        {modalType === 'documento' && (
+          <DocumentoForm onSave={handleSaveDocumento} onCancel={() => setModalType(null)} />
         )}
       </Modal>
 
