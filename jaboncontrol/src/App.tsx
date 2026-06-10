@@ -58,7 +58,7 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [reciboData, setReciboData] = useState<any>(null);
-  const { addVenta, addCliente, addHornada, addRecepcion, addCobro } = useAppContext();
+  const { addVenta, addCliente, addHornada, addRecepcion, addCobro, addProyecto, addEquipo, addDocumento } = useAppContext();
 
   // Detectar tamaño de pantalla
   useEffect(() => {
@@ -159,7 +159,7 @@ function AppContent() {
 
   const handleSaveProyecto = async (data: any) => {
     try {
-      // Por ahora guardamos localmente
+      addProyecto({ progreso: 0, ...data });
       setModalType(null);
       showNotificationMsg('✅ Proyecto registrado correctamente');
     } catch (error) {
@@ -169,7 +169,7 @@ function AppContent() {
 
   const handleSaveEquipo = async (data: any) => {
     try {
-      // Por ahora guardamos localmente
+      addEquipo(data);
       setModalType(null);
       showNotificationMsg('✅ Equipo registrado correctamente');
     } catch (error) {
@@ -179,6 +179,7 @@ function AppContent() {
 
   const handleSaveDocumento = async (data: any) => {
     try {
+      addDocumento(data);
       setModalType(null);
       showNotificationMsg('✅ Documento guardado correctamente');
     } catch (error) {
@@ -196,9 +197,9 @@ function AppContent() {
     ventas: <Ventas onNewClick={() => setModalType('venta')} />,
     cobros: <Cobros onNewClick={() => setModalType('cobro')} />,
     clientes: <Clientes onNewClick={() => setModalType('cliente')} />,
-    proyectos: <Proyectos />,
-    documentacion: <Documentacion />,
-    equipos: <Equipos />,
+    proyectos: <Proyectos onNewClick={() => setModalType('proyecto')} />,
+    documentacion: <Documentacion onNewClick={() => setModalType('documento')} />,
+    equipos: <Equipos onNewClick={() => setModalType('equipo')} />,
     reportes: <Reportes />,
   };
 

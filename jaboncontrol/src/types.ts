@@ -91,3 +91,25 @@ export interface Stock {
   minimo: number;
   maximo: number;
 }
+
+export interface DocumentoApp {
+  id: string;
+  nombre: string;
+  tipo: string;
+  descripcion: string;
+  vencimiento: string;
+  archivo: string;
+  archivoData?: string;
+  fechaSubida: string;
+}
+
+export interface EquipoApp {
+  id: string;
+  nombre: string;
+  tipo: string;
+  estado: string;
+  fechaCompra: string;
+  ubicacion: string;
+  responsable: string;
+  observaciones: string;
+}

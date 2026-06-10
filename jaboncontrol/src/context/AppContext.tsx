@@ -7,6 +7,8 @@ import {
   Cliente,
   Proyecto,
   Stock,
+  DocumentoApp,
+  EquipoApp,
 } from '../types';
 import { ventasService, clientesService, hornadasService, cobrosService, materiasService } from '../services/api';
 
@@ -19,6 +21,8 @@ interface AppContextType {
   clientes: Cliente[];
   proyectos: Proyecto[];
   stocks: Stock[];
+  documentos: DocumentoApp[];
+  equipos: EquipoApp[];
 
   // Actions
   addRecepcion: (data: Recepcion) => void;
@@ -27,10 +31,15 @@ interface AppContextType {
   addCobro: (data: Cobro) => void;
   addCliente: (data: Cliente) => void;
   addProyecto: (data: Proyecto) => void;
+  addDocumento: (data: DocumentoApp) => void;
+  addEquipo: (data: EquipoApp) => void;
 
   deleteRecepcion: (id: string) => void;
   deleteHornada: (id: string) => void;
   deleteVenta: (id: string) => void;
+  deleteProyecto: (id: string) => void;
+  deleteDocumento: (id: string) => void;
+  deleteEquipo: (id: string) => void;
 
   // Stats
   kpis: {
@@ -157,8 +166,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ventas, setVentas] = useState<Venta[]>(initialVentas);
   const [cobros, setCobros] = useState<Cobro[]>(initialCobros);
   const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
-  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('jc_proyectos') || '[]');
+    } catch { return []; }
+  });
   const [stocks] = useState<Stock[]>([]);
+  const [documentos, setDocumentos] = useState<DocumentoApp[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('jc_documentos') || '[]');
+    } catch { return []; }
+  });
+  const [equipos, setEquipos] = useState<EquipoApp[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('jc_equipos') || '[]');
+    } catch { return []; }
+  });
+
+  // Persistir en localStorage (sobreviven recargas de página)
+  useEffect(() => {
+    try {
+      localStorage.setItem('jc_proyectos', JSON.stringify(proyectos));
+    } catch (e) { console.log('⚠️ No se pudo persistir proyectos:', e); }
+  }, [proyectos]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('jc_documentos', JSON.stringify(documentos));
+    } catch (e) { console.log('⚠️ No se pudo persistir documentos (¿archivo muy grande?):', e); }
+  }, [documentos]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('jc_equipos', JSON.stringify(equipos));
+    } catch (e) { console.log('⚠️ No se pudo persistir equipos:', e); }
+  }, [equipos]);
 
   // Cargar datos del API al montar
   useEffect(() => {
@@ -276,7 +318,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addProyecto = (data: Proyecto) => {
-    setProyectos([...proyectos, { ...data, id: Date.now().toString() }]);
+    setProyectos([...proyectos, { ...data, id: data.id || Date.now().toString() }]);
+  };
+
+  const addDocumento = (data: DocumentoApp) => {
+    setDocumentos([...documentos, { ...data, id: data.id || Date.now().toString() }]);
+  };
+
+  const addEquipo = (data: EquipoApp) => {
+    setEquipos([...equipos, { ...data, id: data.id || Date.now().toString() }]);
+  };
+
+  const deleteProyecto = (id: string) => {
+    setProyectos(proyectos.filter((p) => p.id !== id));
+  };
+
+  const deleteDocumento = (id: string) => {
+    setDocumentos(documentos.filter((d) => d.id !== id));
+  };
+
+  const deleteEquipo = (id: string) => {
+    setEquipos(equipos.filter((e) => e.id !== id));
   };
 
   const deleteRecepcion = async (id: string) => {
@@ -326,15 +388,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clientes,
     proyectos,
     stocks,
+    documentos,
+    equipos,
     addRecepcion,
     addHornada,
     addVenta,
     addCobro,
     addCliente,
     addProyecto,
+    addDocumento,
+    addEquipo,
     deleteRecepcion,
     deleteHornada,
     deleteVenta,
+    deleteProyecto,
+    deleteDocumento,
+    deleteEquipo,
     kpis,
   };
 

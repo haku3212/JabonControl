@@ -16,10 +16,27 @@ export function DocumentoForm({ onSave, onCancel }: DocumentoFormProps) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB - límite para almacenamiento local
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      setFile(e.target.files[0]);
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+
+    if (selected.size > MAX_FILE_SIZE) {
+      alert(`El archivo es muy grande (${(selected.size / 1024 / 1024).toFixed(1)} MB). Máximo permitido: 2 MB`);
+      e.target.value = '';
+      return;
     }
+    setFile(selected);
+  };
+
+  const leerArchivoComoBase64 = (archivo: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(archivo);
+    });
   };
 
   const handleSubmit = async () => {
@@ -30,20 +47,14 @@ export function DocumentoForm({ onSave, onCancel }: DocumentoFormProps) {
 
     setLoading(true);
     try {
-      // Crear un FormData para enviar el archivo
-      const formData = new FormData();
-      formData.append('nombre', form.nombre);
-      formData.append('tipo', form.tipo);
-      formData.append('descripcion', form.descripcion);
-      formData.append('vencimiento', form.vencimiento);
-      formData.append('archivo', file);
+      // Leer el archivo como base64 para poder guardarlo y verlo después
+      const archivoData = await leerArchivoComoBase64(file);
 
-      // Aquí iría la llamada al API para subir
-      // Por ahora, simplemente lo guardamos en estado local
       await onSave({
         ...form,
         id: Date.now().toString(),
         archivo: file.name,
+        archivoData,
         fechaSubida: new Date().toISOString().split('T')[0],
       });
     } catch (error) {
@@ -113,7 +124,7 @@ export function DocumentoForm({ onSave, onCancel }: DocumentoFormProps) {
             />
             {file && <p className="text-xs text-accent-yellow mt-1">✅ {file.name}</p>}
           </div>
-          <p className="text-xs text-text-tertiary mt-1">Formatos: PDF, DOC, XLS, JPG, PNG</p>
+          <p className="text-xs text-text-tertiary mt-1">Formatos: PDF, DOC, XLS, JPG, PNG · Máximo 2 MB</p>
         </div>
       </div>
 

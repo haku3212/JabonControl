@@ -2,9 +2,32 @@ import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
 import { useState, useRef, useEffect } from 'react';
 import QRCode from 'qrcode';
+import { useAppContext } from '../../context/AppContext';
+import { EquipoApp } from '../../types';
 
-export function Equipos() {
+interface EquiposProps {
+  onNewClick?: () => void;
+}
+
+const tipoIconos: Record<string, string> = {
+  horno: '🔥',
+  mezclador: '🥣',
+  empacadora: '📦',
+  bascula: '⚖️',
+  otro: '🔧',
+};
+
+const estadoBadge: Record<string, { label: string; type: 'success' | 'warning' | 'danger' }> = {
+  operativo: { label: 'Operativo', type: 'success' },
+  mantenimiento: { label: 'Mantenimiento', type: 'warning' },
+  reparacion: { label: 'Reparación', type: 'warning' },
+  fuera_servicio: { label: 'Fuera de Servicio', type: 'danger' },
+};
+
+export function Equipos({ onNewClick }: EquiposProps) {
+  const { equipos, deleteEquipo } = useAppContext();
   const [equipoQR, setEquipoQR] = useState<string | null>(null);
+  const [historialEquipo, setHistorialEquipo] = useState<EquipoApp | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,17 +42,98 @@ export function Equipos() {
     }
   }, [equipoQR]);
 
+  const handleEliminar = (id: string, nombre: string) => {
+    if (confirm(`¿Eliminar el equipo "${nombre}"?`)) {
+      deleteEquipo(id);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-4 gap-2 flex-wrap">
         <div>
           <h1 className="text-3xl font-bebas tracking-wider">Equipos</h1>
           <p className="text-xs font-mono text-text-tertiary mt-1">INVENTARIO Y ESTADO DE MAQUINARIA</p>
         </div>
-        <button className="px-3 py-1.5 bg-accent-yellow text-black text-xs font-medium rounded">+ Agregar Equipo</button>
+        <button
+          onClick={onNewClick}
+          className="px-3 py-1.5 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
+        >
+          + Agregar Equipo
+        </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      {/* MIS EQUIPOS REGISTRADOS */}
+      {equipos.length === 0 ? (
+        <Card title="Mis Equipos">
+          <div className="text-center py-8">
+            <div className="text-4xl mb-3">⚙️</div>
+            <p className="text-sm text-text-secondary mb-1">No hay equipos registrados todavía</p>
+            <p className="text-xs text-text-tertiary mb-4">
+              Registra tu maquinaria para llevar control de mantenimientos
+            </p>
+            <button
+              onClick={onNewClick}
+              className="px-4 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
+            >
+              + Registrar mi primer equipo
+            </button>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {equipos.map((equipo) => {
+            const badge = estadoBadge[equipo.estado] || estadoBadge.operativo;
+            return (
+              <Card
+                key={equipo.id}
+                title={`${tipoIconos[equipo.tipo] || '🔧'} ${equipo.nombre}`}
+                badge={{ label: badge.label, type: badge.type }}
+              >
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-text-tertiary">Ubicación:</span>
+                    <span className="text-text-primary">{equipo.ubicacion || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-tertiary">Responsable:</span>
+                    <span className="text-text-primary">{equipo.responsable || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-tertiary">Compra:</span>
+                    <span className="font-mono text-text-primary">{equipo.fechaCompra || '—'}</span>
+                  </div>
+                  <div className="w-full mt-3 flex gap-2">
+                    <button
+                      onClick={() => setHistorialEquipo(equipo)}
+                      className="flex-1 px-2 py-1.5 bg-dark-surface3 rounded text-xs border border-dark-border hover:border-accent-yellow"
+                    >
+                      📋 Detalles
+                    </button>
+                    <button
+                      onClick={() => setEquipoQR(equipo.nombre)}
+                      className="flex-1 px-2 py-1.5 bg-accent-yellow text-black rounded text-xs font-medium hover:bg-opacity-90"
+                    >
+                      📱 QR
+                    </button>
+                    <button
+                      onClick={() => handleEliminar(equipo.id, equipo.nombre)}
+                      className="px-2 py-1.5 bg-dark-surface3 rounded text-xs border border-dark-border hover:border-status-danger hover:text-status-danger"
+                      title="Eliminar"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* EQUIPOS DE EJEMPLO */}
+      <p className="text-xs font-mono text-text-tertiary uppercase tracking-wider">Ejemplos de referencia</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
           {
             nombre: 'COMPRESORA #1',
@@ -77,9 +181,6 @@ export function Equipos() {
                 </span>
               </div>
               <div className="w-full mt-3 flex gap-2">
-                <button className="flex-1 px-2 py-1.5 bg-dark-surface3 rounded text-xs border border-dark-border hover:border-accent-yellow">
-                  📋 Historial
-                </button>
                 <button
                   onClick={() => setEquipoQR(equipo.nombre)}
                   className="flex-1 px-2 py-1.5 bg-accent-yellow text-black rounded text-xs font-medium hover:bg-opacity-90"
@@ -92,10 +193,63 @@ export function Equipos() {
         ))}
       </div>
 
+      {/* Modal Detalles/Historial del Equipo */}
+      {historialEquipo && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setHistorialEquipo(null)}>
+          <div className="bg-dark-surface border border-dark-border rounded-lg p-6 max-w-md w-full fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-lg font-bebas text-accent-yellow">
+                📋 {historialEquipo.nombre}
+              </div>
+              <button onClick={() => setHistorialEquipo(null)} className="text-xl text-text-tertiary hover:text-text-primary">✕</button>
+            </div>
+
+            <div className="space-y-3 text-sm mb-4">
+              <div className="flex justify-between border-b border-dark-border pb-2">
+                <span className="text-text-tertiary">Tipo:</span>
+                <span className="text-text-primary">{tipoIconos[historialEquipo.tipo]} {historialEquipo.tipo}</span>
+              </div>
+              <div className="flex justify-between border-b border-dark-border pb-2">
+                <span className="text-text-tertiary">Estado:</span>
+                <Badge
+                  label={(estadoBadge[historialEquipo.estado] || estadoBadge.operativo).label}
+                  type={(estadoBadge[historialEquipo.estado] || estadoBadge.operativo).type}
+                />
+              </div>
+              <div className="flex justify-between border-b border-dark-border pb-2">
+                <span className="text-text-tertiary">Ubicación:</span>
+                <span className="text-text-primary">{historialEquipo.ubicacion || '—'}</span>
+              </div>
+              <div className="flex justify-between border-b border-dark-border pb-2">
+                <span className="text-text-tertiary">Responsable:</span>
+                <span className="text-text-primary">{historialEquipo.responsable || '—'}</span>
+              </div>
+              <div className="flex justify-between border-b border-dark-border pb-2">
+                <span className="text-text-tertiary">Fecha de compra:</span>
+                <span className="font-mono text-text-primary">{historialEquipo.fechaCompra || '—'}</span>
+              </div>
+              {historialEquipo.observaciones && (
+                <div className="pt-2">
+                  <span className="text-text-tertiary text-xs uppercase font-mono">Observaciones:</span>
+                  <p className="text-text-secondary text-xs mt-1">{historialEquipo.observaciones}</p>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setHistorialEquipo(null)}
+              className="w-full px-3 py-2 bg-dark-surface3 text-text-primary text-xs font-medium rounded border border-dark-border hover:border-accent-yellow"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal QR para Equipos */}
       {equipoQR && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setEquipoQR(null)}>
-          <div className="bg-dark-surface border border-dark-border rounded-lg p-6 max-w-md w-full fade-in">
+          <div className="bg-dark-surface border border-dark-border rounded-lg p-6 max-w-md w-full fade-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <div className="text-lg font-bebas text-accent-yellow">📱 Código QR - {equipoQR}</div>
               <button onClick={() => setEquipoQR(null)} className="text-xl text-text-tertiary hover:text-text-primary">✕</button>
