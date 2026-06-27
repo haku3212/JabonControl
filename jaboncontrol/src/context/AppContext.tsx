@@ -215,11 +215,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ]);
 
         // Si la API responde exitosamente, actualizar los datos
-        if (ventasData.status === 'fulfilled') setVentas(ventasData.value);
-        if (clientesData.status === 'fulfilled') setClientes(clientesData.value);
-        if (hornadasData.status === 'fulfilled') setHornadas(hornadasData.value);
-        if (cobrosData.status === 'fulfilled') setCobros(cobrosData.value);
-        if (materiasData.status === 'fulfilled') setRecepciones(materiasData.value);
+        if (ventasData.status === 'fulfilled' && ventasData.value.length > 0) setVentas(ventasData.value);
+        if (clientesData.status === 'fulfilled' && clientesData.value.length > 0) setClientes(clientesData.value);
+        if (hornadasData.status === 'fulfilled' && hornadasData.value.length > 0) setHornadas(hornadasData.value);
+        if (cobrosData.status === 'fulfilled' && cobrosData.value.length > 0) setCobros(cobrosData.value);
+        if (materiasData.status === 'fulfilled' && materiasData.value.length > 0) setRecepciones(materiasData.value);
 
         console.log('✅ Datos cargados desde el API');
       } catch (error) {

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { Login } from './components/Login';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { Modal } from './components/common/Modal';
@@ -15,6 +17,7 @@ import { Proyectos } from './components/panels/Proyectos';
 import { Documentacion } from './components/panels/Documentacion';
 import { Equipos } from './components/panels/Equipos';
 import { Reportes } from './components/panels/Reportes';
+import { Usuarios } from './components/panels/Usuarios';
 import { VentaForm } from './components/forms/VentaForm';
 import { ClienteForm } from './components/forms/ClienteForm';
 import { HornadaForm } from './components/forms/HornadaForm';
@@ -26,6 +29,7 @@ import { DocumentoForm } from './components/forms/DocumentoForm';
 import { Recibo } from './components/Recibo';
 
 const panelTitles: Record<string, [string, string]> = {
+  usuarios: ['Usuarios', 'ADMINISTRACIÓN / USUARIOS'],
   dashboard: ['Dashboard', 'INICIO / DASHBOARD'],
   materias: ['Materias Primas', 'PRODUCCIÓN / MATERIAS PRIMAS'],
   hornadas: ['Hornadas', 'PRODUCCIÓN / HORNADAS'],
@@ -190,6 +194,7 @@ function AppContent() {
   const [title, breadcrumb] = panelTitles[activePanel] || ['Dashboard', 'INICIO / DASHBOARD'];
 
   const panelComponents: Record<string, JSX.Element> = {
+    usuarios: <Usuarios />,
     dashboard: <Dashboard />,
     materias: <MateriasPrimas onNewClick={() => setModalType('recepcion')} />,
     hornadas: <Hornadas onNewClick={() => setModalType('hornada')} />,
@@ -312,10 +317,27 @@ function AppContent() {
   );
 }
 
-export function App() {
+function AuthGate() {
+  const { usuario, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
+        <div className="text-text-tertiary font-mono text-sm">Cargando...</div>
+      </div>
+    );
+  }
+  if (!usuario) return <Login />;
   return (
     <AppProvider>
       <AppContent />
     </AppProvider>
+  );
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
   );
 }
