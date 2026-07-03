@@ -33,6 +33,10 @@ interface AppContextType {
   addProyecto: (data: Proyecto) => void;
   addDocumento: (data: DocumentoApp) => void;
   addEquipo: (data: EquipoApp) => void;
+  updateCliente: (id: string, data: Cliente) => void;
+  updateProyecto: (id: string, data: Proyecto) => void;
+  updateDocumento: (id: string, data: DocumentoApp) => void;
+  updateEquipo: (id: string, data: EquipoApp) => void;
 
   deleteRecepcion: (id: string) => void;
   deleteHornada: (id: string) => void;
@@ -73,6 +77,17 @@ const initialRecepcion: Recepcion[] = [
     unidad: 'kg',
     precioUnitario: 3.2,
     precioTotal: 1600,
+    estado: 'recibido',
+  },
+  {
+    id: '3',
+    fecha: '2026-06-03',
+    proveedor: 'Recolectores Beni',
+    producto: 'Almendra podrida',
+    cantidad: 160,
+    unidad: 'kg',
+    precioUnitario: 2.8,
+    precioTotal: 448,
     estado: 'recibido',
   },
 ];
@@ -143,6 +158,7 @@ const initialClientes: Cliente[] = [
     nombre: 'Distribuidora Litoral',
     tipo: 'distribuidor',
     telefono: '+591 12345678',
+    email: 'ventas@litoral.com.bo',
     ciudad: 'Santa Cruz',
     direccion: 'Calle Principal 123',
     ventaMes: 8400,
@@ -153,12 +169,136 @@ const initialClientes: Cliente[] = [
     nombre: 'Supermercado El Sol',
     tipo: 'retailer',
     telefono: '+591 87654321',
+    email: 'compras@elsol.com.bo',
     ciudad: 'La Paz',
     direccion: 'Avenida Central 456',
     ventaMes: 4800,
     cobradoMes: 3200,
   },
 ];
+
+const demoProyectos: Proyecto[] = [
+  {
+    id: 'demo-proj-1',
+    nombre: 'Implementar control financiero',
+    descripcion: 'Centralizar ventas, cobros, gastos y flujo de caja en una sola vista.',
+    estado: 'activo',
+    responsable: 'Administracion',
+    progreso: 50,
+    fechaInicio: '2026-07-01',
+    fechaFin: '2026-07-18',
+    presupuesto: 4500,
+    tareas: [
+      { id: 'p1-t1', texto: 'Definir categorias de gastos', completada: true },
+      { id: 'p1-t2', texto: 'Importar movimientos desde Excel', completada: true },
+      { id: 'p1-t3', texto: 'Validar resumen mensual', completada: false },
+      { id: 'p1-t4', texto: 'Exportar reporte financiero', completada: false },
+    ],
+  },
+  {
+    id: 'demo-proj-2',
+    nombre: 'Mantenimiento preventivo de equipos',
+    descripcion: 'Organizar revisiones de selladora, compresora y mezcladores.',
+    estado: 'activo',
+    responsable: 'Jefe de planta',
+    progreso: 40,
+    fechaInicio: '2026-07-03',
+    fechaFin: '2026-07-25',
+    presupuesto: 2800,
+    tareas: [
+      { id: 'p2-t1', texto: 'Revisar compresora principal', completada: true },
+      { id: 'p2-t2', texto: 'Cambiar resistencia de selladora', completada: false },
+      { id: 'p2-t3', texto: 'Registrar repuestos utilizados', completada: false },
+    ],
+  },
+  {
+    id: 'demo-proj-3',
+    nombre: 'Estandarizar hornadas',
+    descripcion: 'Reducir variacion de rendimiento y documentar receta operativa.',
+    estado: 'pausado',
+    responsable: 'Produccion',
+    progreso: 30,
+    fechaInicio: '2026-06-20',
+    fechaFin: '2026-08-05',
+    presupuesto: 1600,
+    tareas: [
+      { id: 'p3-t1', texto: 'Comparar ultimas 10 hornadas', completada: true },
+      { id: 'p3-t2', texto: 'Definir rango ideal de temperatura', completada: false },
+      { id: 'p3-t3', texto: 'Capacitar operarios', completada: false },
+    ],
+  },
+  {
+    id: 'demo-proj-4',
+    nombre: 'Renovar documentacion ambiental',
+    descripcion: 'Actualizar permisos, certificados y respaldos verificables.',
+    estado: 'activo',
+    responsable: 'Gerencia',
+    progreso: 65,
+    fechaInicio: '2026-07-02',
+    fechaFin: '2026-07-30',
+    presupuesto: 3200,
+    tareas: [
+      { id: 'p4-t1', texto: 'Subir licencia ambiental vigente', completada: true },
+      { id: 'p4-t2', texto: 'Adjuntar informe de efluentes', completada: true },
+      { id: 'p4-t3', texto: 'Generar QR de verificacion', completada: false },
+    ],
+  },
+  {
+    id: 'demo-proj-5',
+    nombre: 'Plan comercial regional',
+    descripcion: 'Organizar ventas por cliente y mejorar recuperacion de credito.',
+    estado: 'activo',
+    responsable: 'Ventas',
+    progreso: 25,
+    fechaInicio: '2026-07-05',
+    fechaFin: '2026-08-15',
+    presupuesto: 5200,
+    tareas: [
+      { id: 'p5-t1', texto: 'Clasificar clientes por deuda', completada: false },
+      { id: 'p5-t2', texto: 'Definir visitas semanales', completada: true },
+      { id: 'p5-t3', texto: 'Actualizar lista de precios', completada: false },
+    ],
+  },
+  {
+    id: 'demo-proj-6',
+    nombre: 'Mejora de empaque',
+    descripcion: 'Evaluar nuevos diseños de caja, etiqueta y presentacion.',
+    estado: 'completado',
+    responsable: 'Calidad',
+    progreso: 100,
+    fechaInicio: '2026-06-01',
+    fechaFin: '2026-06-28',
+    presupuesto: 2100,
+    tareas: [
+      { id: 'p6-t1', texto: 'Probar etiqueta resistente a humedad', completada: true },
+      { id: 'p6-t2', texto: 'Validar caja con distribuidor', completada: true },
+      { id: 'p6-t3', texto: 'Aprobar arte final', completada: true },
+    ],
+  },
+];
+
+const demoEquipos: EquipoApp[] = [
+  { id: 'demo-eq-1', nombre: 'Compresora principal', tipo: 'otro', estado: 'operativo', fechaCompra: '2024-03-10', ubicacion: 'Area de acabado', responsable: 'Pedro Gutierrez', observaciones: 'Revision trimestral programada.', especificaciones: 'Potencia: 7.5 HP\nPresion: 120 PSI\nVoltaje: 220V trifasico\nCapacidad tanque: 300 L' },
+  { id: 'demo-eq-2', nombre: 'Selladora horizontal', tipo: 'empacadora', estado: 'mantenimiento', fechaCompra: '2023-11-18', ubicacion: 'Linea de sellado', responsable: 'Ana Ruiz', observaciones: 'Requiere cambio de resistencia.', especificaciones: 'Potencia: 2.2 kW\nAncho sellado: 12 mm\nVoltaje: 220V\nMaterial: acero inoxidable' },
+  { id: 'demo-eq-3', nombre: 'Mezclador 1000L', tipo: 'mezclador', estado: 'operativo', fechaCompra: '2022-05-05', ubicacion: 'Planta baja', responsable: 'Carlos Mendoza', observaciones: 'Funcionamiento estable.', especificaciones: 'Capacidad: 1000 L\nMotor: 5 HP\nRPM: 60\nMaterial: acero inoxidable' },
+  { id: 'demo-eq-4', nombre: 'Bascula industrial', tipo: 'bascula', estado: 'operativo', fechaCompra: '2025-01-14', ubicacion: 'Almacen', responsable: 'Rosa Vargas', observaciones: 'Calibrada en junio.', especificaciones: 'Capacidad: 1000 kg\nPrecision: 100 g\nPlataforma: 1.2 x 1.2 m\nCertificacion: vigente' },
+  { id: 'demo-eq-5', nombre: 'Horno auxiliar', tipo: 'horno', estado: 'reparacion', fechaCompra: '2021-09-30', ubicacion: 'Produccion', responsable: 'Tecnico externo', observaciones: 'Pendiente repuesto.', especificaciones: 'Capacidad: 500 kg\nQuemador: gas\nTemperatura max: 180 C\nControl: manual' },
+  { id: 'demo-eq-6', nombre: 'Etiquetadora manual', tipo: 'empacadora', estado: 'operativo', fechaCompra: '2024-08-22', ubicacion: 'Empaque', responsable: 'Equipo de acabado', observaciones: 'Uso diario.', especificaciones: 'Ancho etiqueta: 20-120 mm\nVelocidad: manual\nMaterial: acero pintado\nUso: envases y cajas' },
+];
+
+const demoDocumentos: DocumentoApp[] = [
+  { id: 'demo-doc-1', nombre: 'Licencia ambiental municipal', tipo: 'permiso', descripcion: 'Permiso vigente de operacion ambiental.', vencimiento: '2026-12-31', archivo: 'licencia_ambiental.pdf', fechaSubida: '2026-07-01' },
+  { id: 'demo-doc-2', nombre: 'Ficha tecnica NaOH', tipo: 'ficha-tecnica', descripcion: 'Hoja tecnica y seguridad de soda caustica.', vencimiento: '', archivo: 'ficha_naoh.pdf', fechaSubida: '2026-07-01' },
+  { id: 'demo-doc-3', nombre: 'Certificado aceite almendra', tipo: 'ficha-tecnica', descripcion: 'Certificado de proveedor Amazon Nuts.', vencimiento: '2026-11-15', archivo: 'certificado_aceite.pdf', fechaSubida: '2026-07-02' },
+  { id: 'demo-doc-4', nombre: 'Registro sanitario', tipo: 'permiso', descripcion: 'Documento de habilitacion sanitaria.', vencimiento: '2026-08-20', archivo: 'registro_sanitario.pdf', fechaSubida: '2026-07-02' },
+  { id: 'demo-doc-5', nombre: 'Manual compresora', tipo: 'otro', descripcion: 'Manual operativo del equipo.', vencimiento: '', archivo: 'manual_compresora.pdf', fechaSubida: '2026-07-03' },
+  { id: 'demo-doc-6', nombre: 'Informe efluentes junio', tipo: 'otro', descripcion: 'Monitoreo ambiental mensual.', vencimiento: '', archivo: 'efluentes_junio.xlsx', fechaSubida: '2026-07-03' },
+];
+
+const mergeDemo = <T extends { id: string }>(saved: T[], demo: T[]) => {
+  const savedIds = new Set(saved.map((item) => item.id));
+  return [...saved, ...demo.filter((item) => !savedIds.has(item.id))];
+};
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [recepciones, setRecepciones] = useState<Recepcion[]>(initialRecepcion);
@@ -168,19 +308,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
   const [proyectos, setProyectos] = useState<Proyecto[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('jc_proyectos') || '[]');
-    } catch { return []; }
+      const saved = JSON.parse(localStorage.getItem('jc_proyectos') || '[]');
+      return mergeDemo(saved, demoProyectos);
+    } catch { return demoProyectos; }
   });
   const [stocks] = useState<Stock[]>([]);
   const [documentos, setDocumentos] = useState<DocumentoApp[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('jc_documentos') || '[]');
-    } catch { return []; }
+      const saved = JSON.parse(localStorage.getItem('jc_documentos') || '[]');
+      return mergeDemo(saved, demoDocumentos);
+    } catch { return demoDocumentos; }
   });
   const [equipos, setEquipos] = useState<EquipoApp[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem('jc_equipos') || '[]');
-    } catch { return []; }
+      const saved = JSON.parse(localStorage.getItem('jc_equipos') || '[]');
+      return mergeDemo(saved, demoEquipos);
+    } catch { return demoEquipos; }
   });
 
   // Persistir en localStorage (sobreviven recargas de página)
@@ -270,6 +413,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         nombre: data.cliente,
         tipo: 'distribuidor',
         telefono: '',
+        email: '',
         ciudad: '',
         direccion: '',
         ventaMes: data.total || 0,
@@ -291,12 +435,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addCobro = async (data: Cobro) => {
+  const addCobro = async (data: Cobro & { distribucion?: { id: string; aplicado: number }[] }) => {
     // Agregar localmente primero (respuesta inmediata)
     const dataConId = { ...data, id: data.id || Date.now().toString() };
     setCobros([...cobros, dataConId]);
 
-    // Luego intentar guardar en API en background
+    // Descontar los saldos de las ventas afectadas (FIFO local)
+    if (data.distribucion && data.distribucion.length > 0) {
+      const aplicados = new Map(data.distribucion.map((d) => [d.id, d.aplicado]));
+      setVentas(ventas.map((v) => {
+        const aplicado = aplicados.get(v.id);
+        if (!aplicado) return v;
+        const saldoActual = v.saldoPendiente ?? (v.total || v.precioTotal || 0);
+        const nuevoSaldo = Math.max(0, Math.round((saldoActual - aplicado) * 100) / 100);
+        return {
+          ...v,
+          saldoPendiente: nuevoSaldo,
+          estado: nuevoSaldo <= 0 ? 'pagado' : 'parcial',
+        };
+      }));
+    }
+
+    // Luego guardar en API en background (el backend aplica el mismo FIFO en la BD)
     try {
       await cobrosService.crear(data);
     } catch (error) {
@@ -317,6 +477,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateCliente = async (id: string, data: Cliente) => {
+    const previous = clientes.find((cliente) => cliente.id === id);
+    setClientes(clientes.map((cliente) => (cliente.id === id ? { ...cliente, ...data, id } : cliente)));
+
+    try {
+      await clientesService.actualizar(id, data);
+    } catch (error) {
+      console.log('Error al actualizar cliente en API:', error);
+      if (previous) {
+        setClientes(clientes.map((cliente) => (cliente.id === id ? previous : cliente)));
+      }
+    }
+  };
+
   const addProyecto = (data: Proyecto) => {
     setProyectos([...proyectos, { ...data, id: data.id || Date.now().toString() }]);
   };
@@ -327,6 +501,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addEquipo = (data: EquipoApp) => {
     setEquipos([...equipos, { ...data, id: data.id || Date.now().toString() }]);
+  };
+
+  const updateProyecto = (id: string, data: Proyecto) => {
+    setProyectos(proyectos.map((p) => (p.id === id ? { ...p, ...data, id } : p)));
+  };
+
+  const updateDocumento = (id: string, data: DocumentoApp) => {
+    setDocumentos(documentos.map((d) => (d.id === id ? { ...d, ...data, id } : d)));
+  };
+
+  const updateEquipo = (id: string, data: EquipoApp) => {
+    setEquipos(equipos.map((e) => (e.id === id ? { ...e, ...data, id } : e)));
   };
 
   const deleteProyecto = (id: string) => {
@@ -375,9 +561,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     produccionHoy: hornadas.reduce((sum, h) => sum + h.produccionTotal, 0),
     stockJabon: 4210,
     ventasMes: ventas.reduce((sum, v) => sum + (v.total || v.precioTotal || 0), 0),
-    cobrosPendientes: ventas
-      .filter((v) => v.tipoPago === 'credito')
-      .reduce((sum, v) => sum + (v.total || v.precioTotal || 0), 0),
+    cobrosPendientes: ventas.reduce(
+      (sum, v) => sum + (v.saldoPendiente ?? (v.tipoPago === 'credito' ? (v.total || v.precioTotal || 0) : 0)),
+      0
+    ),
   };
 
   const value: AppContextType = {
@@ -398,6 +585,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addProyecto,
     addDocumento,
     addEquipo,
+    updateCliente,
+    updateProyecto,
+    updateDocumento,
+    updateEquipo,
     deleteRecepcion,
     deleteHornada,
     deleteVenta,

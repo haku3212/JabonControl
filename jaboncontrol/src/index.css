@@ -60,3 +60,32 @@ html, body, #root {
 .slide-in {
   animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+input,
+select,
+textarea {
+  min-height: 2.5rem;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+}
+
+/* Mantiene las tablas legibles en pantallas pequenas sin romper el layout. */
+.overflow-x-auto > table {
+  min-width: 720px;
+}
+
+/* Evita que graficos y tarjetas se desborden horizontalmente en movil. */
+.recharts-responsive-container {
+  min-width: 0;
+}
+
+/* Reduce la escala minima de tablas en telefonos muy pequenos. */
+@media (max-width: 640px) {
+  .overflow-x-auto > table {
+    min-width: 640px;
+  }
+}

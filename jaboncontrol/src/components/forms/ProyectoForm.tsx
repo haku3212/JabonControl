@@ -3,17 +3,22 @@ import { useState } from 'react';
 interface ProyectoFormProps {
   onSave: (data: any) => Promise<void>;
   onCancel: () => void;
+  initialData?: any;
 }
 
-export function ProyectoForm({ onSave, onCancel }: ProyectoFormProps) {
+export function ProyectoForm({ onSave, onCancel, initialData }: ProyectoFormProps) {
+  const [tareasText, setTareasText] = useState(
+    (initialData?.tareas || []).map((tarea: any) => tarea.texto).join('\n')
+  );
   const [form, setForm] = useState({
-    nombre: '',
-    descripcion: '',
-    estado: 'activo' as 'activo' | 'pausado' | 'completado',
-    responsable: 'Admin',
-    fechaInicio: new Date().toISOString().split('T')[0],
-    fechaFin: '',
-    presupuesto: 0,
+    nombre: initialData?.nombre || '',
+    descripcion: initialData?.descripcion || '',
+    estado: (initialData?.estado || 'activo') as 'activo' | 'pausado' | 'completado',
+    responsable: initialData?.responsable || 'Admin',
+    fechaInicio: initialData?.fechaInicio || new Date().toISOString().split('T')[0],
+    fechaFin: initialData?.fechaFin || '',
+    presupuesto: initialData?.presupuesto || 0,
+    progreso: initialData?.progreso || 0,
   });
 
   const [loading, setLoading] = useState(false);
@@ -28,7 +33,16 @@ export function ProyectoForm({ onSave, onCancel }: ProyectoFormProps) {
     try {
       await onSave({
         ...form,
-        id: Date.now().toString(),
+        tareas: tareasText
+          .split('\n')
+          .map((line: string) => line.trim())
+          .filter(Boolean)
+          .map((texto: string, index: number) => ({
+            id: initialData?.tareas?.[index]?.id || `${Date.now()}-${index}`,
+            texto,
+            completada: initialData?.tareas?.[index]?.completada || false,
+          })),
+        id: initialData?.id || Date.now().toString(),
       });
     } catch (error) {
       alert('Error al guardar el proyecto');
@@ -119,6 +133,21 @@ export function ProyectoForm({ onSave, onCancel }: ProyectoFormProps) {
           />
         </div>
 
+        <div>
+          <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">
+            Progreso (%)
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={form.progreso || ''}
+            onChange={(e) => setForm({ ...form, progreso: Math.min(100, Math.max(0, Number(e.target.value))) })}
+            placeholder="0"
+            className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+          />
+        </div>
+
         <div className="col-span-1 sm:col-span-2">
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">
             Descripción (opcional)
@@ -129,6 +158,19 @@ export function ProyectoForm({ onSave, onCancel }: ProyectoFormProps) {
             placeholder="Detalles del proyecto..."
             rows={3}
             className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none resize-none"
+          />
+        </div>
+
+        <div className="col-span-1 sm:col-span-2">
+          <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">
+            Tareas del proyecto (una por linea)
+          </label>
+          <textarea
+            value={tareasText}
+            onChange={(e) => setTareasText(e.target.value)}
+            placeholder={'Comprar repuestos\nInstalar equipo\nValidar funcionamiento'}
+            rows={5}
+            className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none resize-y"
           />
         </div>
       </div>

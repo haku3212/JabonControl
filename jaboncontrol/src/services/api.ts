@@ -1,55 +1,44 @@
 // API Base URL - Conecta al backend en Railway o localhost en desarrollo
-const API_BASE_URL = 'https://jaboncontrol-production.up.railway.app/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (
+  import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://jaboncontrol-production.up.railway.app/api'
+);
+
+async function parseResponse(response: Response) {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `Error: ${response.status}`);
+  }
+  return data;
+}
+
+const requestOptions = (method: string, data?: any): RequestInit => ({
+  method,
+  credentials: 'include',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+});
 
 export const apiClient = {
   async get(endpoint: string) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-      },
-    });
-    if (!response.ok) throw new Error(`Error: ${response.status}`);
-    return response.json();
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('GET'));
+    return parseResponse(response);
   },
 
   async post(endpoint: string, data: any) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error(`Error: ${response.status}`);
-    return response.json();
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('POST', data));
+    return parseResponse(response);
   },
 
   async put(endpoint: string, data: any) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) throw new Error(`Error: ${response.status}`);
-    return response.json();
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('PUT', data));
+    return parseResponse(response);
   },
 
   async delete(endpoint: string) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-      },
-    });
-    if (!response.ok) throw new Error(`Error: ${response.status}`);
-    return response.json();
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('DELETE'));
+    return parseResponse(response);
   },
 };
 
@@ -86,7 +75,21 @@ export const clientesService = {
 
 export const hornadasService = {
   async listar() {
-    return apiClient.get('/hornadas');
+    const rows = await apiClient.get('/hornadas');
+    return rows.map((row: any) => ({
+      ...row,
+      ingredientes: row.ingredientes || {
+        naohVolumen: Number(row.naohVolumen || 0),
+        seboFund: Number(row.seboFund || 0),
+        aceiteQuem: Number(row.aceiteQuem || 0),
+        aceiteCrudo: Number(row.aceiteCrudo || 0),
+        aceiteAlmendra: Number(row.aceiteAlmendra || 0),
+        agua: Number(row.agua || 0),
+        jabonRecicl: Number(row.jabonRecicl || 0),
+      },
+      produccionTotal: Number(row.produccionTotal || 0),
+      rendimiento: Number(row.rendimiento || 0),
+    }));
   },
   async crear(data: any) {
     return apiClient.post('/hornadas', data);
@@ -123,15 +126,48 @@ export const materiasService = {
 export const authService = {
   async login(usuario: string, password: string) {
     const response = await apiClient.post('/auth/login', { usuario, password });
-    if (response.token) {
-      localStorage.setItem('token', response.token);
-    }
     return response;
   },
   async logout() {
-    localStorage.removeItem('token');
+    await apiClient.post('/auth/logout', {});
   },
   async verificar() {
     return apiClient.get('/auth/verify');
+  },
+};
+
+export const usuariosService = {
+  async listar() {
+    return apiClient.get('/usuarios');
+  },
+  async crear(data: any) {
+    return apiClient.post('/usuarios', data);
+  },
+  async actualizar(id: string, data: any) {
+    return apiClient.put(`/usuarios/${id}`, data);
+  },
+  async eliminar(id: string) {
+    return apiClient.delete(`/usuarios/${id}`);
+  },
+};
+
+export const auditoriaService = {
+  async listar() {
+    return apiClient.get('/auditoria');
+  },
+};
+
+export const finanzasService = {
+  async listarMovimientos() {
+    return apiClient.get('/finanzas/movimientos');
+  },
+  async crearMovimiento(data: any) {
+    return apiClient.post('/finanzas/movimientos', data);
+  },
+  async importarMovimientos(movimientos: any[]) {
+    return apiClient.post('/finanzas/importar', { movimientos });
+  },
+  async eliminarMovimiento(id: string) {
+    return apiClient.delete(`/finanzas/movimientos/${id}`);
   },
 };

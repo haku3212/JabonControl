@@ -41,6 +41,8 @@ export interface Venta {
   total?: number;
   tipoPago: 'credito' | 'contado' | 'transferencia' | 'cancelado';
   precioTotal?: number; // For backward compatibility
+  saldoPendiente?: number; // Lo que el cliente aún debe de esta venta
+  estado?: string; // 'pendiente' | 'parcial' | 'pagado'
 }
 
 export interface Cobro {
@@ -66,6 +68,7 @@ export interface Cliente {
   nombre: string;
   tipo: string;
   telefono: string;
+  email?: string;
   ciudad: string;
   direccion: string;
   ventaMes: number;
@@ -81,6 +84,12 @@ export interface Proyecto {
   progreso: number;
   fechaInicio: string;
   fechaFin: string;
+  presupuesto?: number;
+  tareas?: Array<{
+    id: string;
+    texto: string;
+    completada: boolean;
+  }>;
 }
 
 export interface Stock {
@@ -103,6 +112,15 @@ export interface DocumentoApp {
   fechaSubida: string;
 }
 
+export interface EquipoDocumento {
+  id: string;
+  nombre: string;
+  tipo: string;
+  tamano: number;
+  archivoData: string;
+  fechaSubida: string;
+}
+
 export interface EquipoApp {
   id: string;
   nombre: string;
@@ -112,4 +130,7 @@ export interface EquipoApp {
   ubicacion: string;
   responsable: string;
   observaciones: string;
+  imagenData?: string;
+  especificaciones?: string;
+  documentos?: EquipoDocumento[];
 }

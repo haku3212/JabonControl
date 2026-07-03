@@ -20,8 +20,8 @@ const badgeColors = {
 
 export function Card({ title, children, action, badge }: CardProps) {
   return (
-    <div className="bg-dark-surface border border-dark-border rounded-lg overflow-hidden">
-      <div className="px-5 py-3.5 border-b border-dark-border flex items-center justify-between">
+    <div className="bg-dark-surface border border-dark-border rounded-lg overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
+      <div className="px-5 py-3.5 border-b border-dark-border flex items-center justify-between bg-dark-surface2 bg-opacity-40">
         <div className="text-xs font-mono text-text-secondary uppercase tracking-widest">
           {title}
         </div>
@@ -34,7 +34,7 @@ export function Card({ title, children, action, badge }: CardProps) {
           {action}
         </div>
       </div>
-      <div className="p-4">
+      <div className="p-5">
         {children}
       </div>
     </div>

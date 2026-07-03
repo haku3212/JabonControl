@@ -1,127 +1,200 @@
+import { useState } from 'react';
 import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
-import { useState, useRef, useEffect } from 'react';
-import QRCode from 'qrcode';
+import { Modal } from '../common/Modal';
+import { EquipoForm } from '../forms/EquipoForm';
 import { useAppContext } from '../../context/AppContext';
-import { EquipoApp } from '../../types';
+import type { EquipoApp, EquipoDocumento } from '../../types';
 
 interface EquiposProps {
   onNewClick?: () => void;
 }
 
-const tipoIconos: Record<string, string> = {
-  horno: '🔥',
-  mezclador: '🥣',
-  empacadora: '📦',
-  bascula: '⚖️',
-  otro: '🔧',
-};
-
+// Traduce el estado interno a texto y color visual.
 const estadoBadge: Record<string, { label: string; type: 'success' | 'warning' | 'danger' }> = {
   operativo: { label: 'Operativo', type: 'success' },
   mantenimiento: { label: 'Mantenimiento', type: 'warning' },
-  reparacion: { label: 'Reparación', type: 'warning' },
-  fuera_servicio: { label: 'Fuera de Servicio', type: 'danger' },
+  reparacion: { label: 'Reparacion', type: 'warning' },
+  fuera_servicio: { label: 'Fuera de servicio', type: 'danger' },
 };
 
-export function Equipos({ onNewClick }: EquiposProps) {
-  const { equipos, deleteEquipo } = useAppContext();
-  const [equipoQR, setEquipoQR] = useState<string | null>(null);
-  const [historialEquipo, setHistorialEquipo] = useState<EquipoApp | null>(null);
-  const qrRef = useRef<HTMLDivElement>(null);
+// Texto de respaldo cuando no hay imagen cargada.
+function EquipmentImage({ equipo }: { equipo: EquipoApp }) {
+  return (
+    <div className="h-40 rounded border border-dark-border bg-dark-surface2 overflow-hidden flex items-center justify-center">
+      {equipo.imagenData ? (
+        <img src={equipo.imagenData} alt={equipo.nombre} className="w-full h-full object-cover" />
+      ) : (
+        <div className="text-center px-4">
+          <div className="text-2xl font-bebas text-text-tertiary">{equipo.tipo}</div>
+          <div className="text-xs text-text-tertiary mt-1">Sin imagen asociada</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
-  useEffect(() => {
-    if (qrRef.current && equipoQR) {
-      qrRef.current.innerHTML = '';
-      const datosQR = `EQUIPO|${equipoQR}|${new Date().toISOString().split('T')[0]}`;
-      QRCode.toCanvas(qrRef.current, datosQR, {
-        width: 200,
-        margin: 2,
-        color: { dark: '#000000', light: '#FFFFFF' },
-      }).catch((err: unknown) => console.error('Error QR:', err));
-    }
-  }, [equipoQR]);
+// Convierte especificaciones escritas linea por linea en una lista legible.
+function SpecsList({ specs }: { specs?: string }) {
+  // Si no hay especificaciones, mostramos una ayuda breve.
+  if (!specs?.trim()) {
+    return <div className="text-xs text-text-tertiary">Sin especificaciones registradas.</div>;
+  }
 
+  // Separamos por linea para respetar el formato del usuario.
+  const lines = specs.split('\n').map((line) => line.trim()).filter(Boolean);
+
+  return (
+    <div className="space-y-1">
+      {lines.map((line, index) => (
+        <div key={index} className="text-xs text-text-secondary border-b border-dark-border last:border-0 pb-1 last:pb-0">
+          {line}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Muestra documentos guardados y permite abrirlos en otra pestaña.
+function DocumentsList({ documentos }: { documentos?: EquipoDocumento[] }) {
+  // Sin documentos, dejamos claro que todavia no hay respaldo digital.
+  if (!documentos?.length) {
+    return <div className="text-xs text-text-tertiary">Sin documentos adjuntos.</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {documentos.map((documento) => (
+        <div key={documento.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded border border-dark-border bg-dark-surface px-3 py-2">
+          <div>
+            <div className="text-sm text-text-primary break-all">{documento.nombre}</div>
+            <div className="text-[11px] text-text-tertiary">
+              {documento.tipo || 'Archivo'} - {(documento.tamano / 1024).toFixed(0)} KB - {documento.fechaSubida}
+            </div>
+          </div>
+          <a
+            href={documento.archivoData}
+            download={documento.nombre}
+            target="_blank"
+            rel="noreferrer"
+            className="px-3 py-1.5 bg-dark-surface3 rounded text-xs border border-dark-border hover:border-accent-yellow text-center"
+          >
+            Abrir
+          </a>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Equipos({ onNewClick: _onNewClick }: EquiposProps) {
+  // Leemos equipos y acciones CRUD locales desde el contexto.
+  const { equipos, addEquipo, updateEquipo, deleteEquipo } = useAppContext();
+
+  // Equipo seleccionado para ver ficha completa.
+  const [detailEquipo, setDetailEquipo] = useState<EquipoApp | null>(null);
+
+  // Equipo seleccionado para editar; null significa crear nuevo.
+  const [editing, setEditing] = useState<EquipoApp | null>(null);
+
+  // Controla apertura del formulario.
+  const [showForm, setShowForm] = useState(false);
+
+  // Abre el formulario en modo nuevo.
+  const openNew = () => {
+    setEditing(null);
+    setShowForm(true);
+  };
+
+  // Elimina con confirmacion para evitar borrados accidentales.
   const handleEliminar = (id: string, nombre: string) => {
-    if (confirm(`¿Eliminar el equipo "${nombre}"?`)) {
+    if (confirm(`Eliminar el equipo "${nombre}"?`)) {
       deleteEquipo(id);
     }
   };
 
+  // Guarda creando o actualizando segun exista editing.
+  const handleSave = async (data: EquipoApp) => {
+    if (editing) {
+      updateEquipo(editing.id, data);
+    } else {
+      addEquipo(data);
+    }
+    setShowForm(false);
+    setEditing(null);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start mb-4 gap-2 flex-wrap">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-3">
         <div>
           <h1 className="text-3xl font-bebas tracking-wider">Equipos</h1>
-          <p className="text-xs font-mono text-text-tertiary mt-1">INVENTARIO Y ESTADO DE MAQUINARIA</p>
+          <p className="text-xs font-mono text-text-tertiary mt-1">INVENTARIO, IMAGEN Y ESPECIFICACIONES TECNICAS</p>
         </div>
-        <button
-          onClick={onNewClick}
-          className="px-3 py-1.5 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
-        >
-          + Agregar Equipo
+        <button onClick={openNew} className="px-3 py-2 bg-accent-yellow text-black text-xs font-semibold rounded hover:bg-opacity-90 w-fit">
+          + Agregar equipo
         </button>
       </div>
 
-      {/* MIS EQUIPOS REGISTRADOS */}
       {equipos.length === 0 ? (
-        <Card title="Mis Equipos">
+        <Card title="Mis equipos">
           <div className="text-center py-8">
-            <div className="text-4xl mb-3">⚙️</div>
-            <p className="text-sm text-text-secondary mb-1">No hay equipos registrados todavía</p>
-            <p className="text-xs text-text-tertiary mb-4">
-              Registra tu maquinaria para llevar control de mantenimientos
-            </p>
-            <button
-              onClick={onNewClick}
-              className="px-4 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
-            >
-              + Registrar mi primer equipo
+            <p className="text-sm text-text-secondary mb-1">No hay equipos registrados todavia</p>
+            <p className="text-xs text-text-tertiary mb-4">Registra maquinaria con foto, responsable y especificaciones.</p>
+            <button onClick={openNew} className="px-4 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90">
+              Registrar primer equipo
             </button>
           </div>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {equipos.map((equipo) => {
+            // Elegimos el badge segun estado, con operativo como fallback.
             const badge = estadoBadge[equipo.estado] || estadoBadge.operativo;
+
             return (
-              <Card
-                key={equipo.id}
-                title={`${tipoIconos[equipo.tipo] || '🔧'} ${equipo.nombre}`}
-                badge={{ label: badge.label, type: badge.type }}
-              >
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-text-tertiary">Ubicación:</span>
-                    <span className="text-text-primary">{equipo.ubicacion || '—'}</span>
+              <Card key={equipo.id} title={equipo.nombre} badge={{ label: badge.label, type: badge.type }}>
+                <div className="space-y-4 text-sm">
+                  <EquipmentImage equipo={equipo} />
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Info label="Tipo" value={equipo.tipo || '-'} />
+                    <Info label="Compra" value={equipo.fechaCompra || '-'} />
+                    <Info label="Ubicacion" value={equipo.ubicacion || '-'} />
+                    <Info label="Responsable" value={equipo.responsable || '-'} />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-tertiary">Responsable:</span>
-                    <span className="text-text-primary">{equipo.responsable || '—'}</span>
+
+                  <div className="rounded border border-dark-border bg-dark-surface2 p-3">
+                    <div className="text-xs font-mono text-text-tertiary uppercase mb-2">Especificaciones</div>
+                    <SpecsList specs={equipo.especificaciones} />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-tertiary">Compra:</span>
-                    <span className="font-mono text-text-primary">{equipo.fechaCompra || '—'}</span>
+
+                  <div className="rounded border border-dark-border bg-dark-surface2 p-3">
+                    <div className="text-xs font-mono text-text-tertiary uppercase mb-2">Documentos</div>
+                    <div className="text-xs text-text-secondary">{equipo.documentos?.length || 0} archivo(s) adjunto(s)</div>
                   </div>
-                  <div className="w-full mt-3 flex gap-2">
+
+                  <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => setHistorialEquipo(equipo)}
-                      className="flex-1 px-2 py-1.5 bg-dark-surface3 rounded text-xs border border-dark-border hover:border-accent-yellow"
+                      onClick={() => {
+                        setEditing(equipo);
+                        setShowForm(true);
+                      }}
+                      className="flex-1 min-w-24 px-2 py-1.5 bg-dark-surface3 rounded text-xs border border-dark-border hover:border-accent-blue hover:text-accent-blue"
                     >
-                      📋 Detalles
+                      Editar
                     </button>
                     <button
-                      onClick={() => setEquipoQR(equipo.nombre)}
-                      className="flex-1 px-2 py-1.5 bg-accent-yellow text-black rounded text-xs font-medium hover:bg-opacity-90"
+                      onClick={() => setDetailEquipo(equipo)}
+                      className="flex-1 min-w-24 px-2 py-1.5 bg-dark-surface3 rounded text-xs border border-dark-border hover:border-accent-yellow"
                     >
-                      📱 QR
+                      Detalles
                     </button>
                     <button
                       onClick={() => handleEliminar(equipo.id, equipo.nombre)}
                       className="px-2 py-1.5 bg-dark-surface3 rounded text-xs border border-dark-border hover:border-status-danger hover:text-status-danger"
-                      title="Eliminar"
                     >
-                      🗑️
+                      Eliminar
                     </button>
                   </div>
                 </div>
@@ -131,164 +204,51 @@ export function Equipos({ onNewClick }: EquiposProps) {
         </div>
       )}
 
-      {/* EQUIPOS DE EJEMPLO */}
-      <p className="text-xs font-mono text-text-tertiary uppercase tracking-wider">Ejemplos de referencia</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[
-          {
-            nombre: 'COMPRESORA #1',
-            ubicacion: 'Sala principal',
-            potencia: '7.5 HP',
-            ultimoMant: '15/03/26',
-            proximoMant: '15/07/26',
-            estado: 'success'
-          },
-          {
-            nombre: 'SELLADORA',
-            ubicacion: 'Acabado',
-            potencia: '2.2 kW',
-            ultimoMant: '10/01/26',
-            proximoMant: 'Vencido',
-            estado: 'warning'
-          },
-          {
-            nombre: 'TANQUES MEZCLA',
-            ubicacion: 'Planta baja',
-            potencia: '3 × 1,000 lts',
-            ultimoMant: '01/05/26',
-            proximoMant: '01/08/26',
-            estado: 'success'
-          },
-        ].map((equipo) => (
-          <Card key={equipo.nombre} title={equipo.nombre} badge={{ label: equipo.estado === 'success' ? 'Operativo' : 'Revisión pendiente', type: equipo.estado as 'success' | 'warning' }}>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-text-tertiary">Ubicación:</span>
-                <span className="text-text-primary">{equipo.ubicacion}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-tertiary">Potencia:</span>
-                <span className="font-mono text-text-primary">{equipo.potencia}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-tertiary">Último mant.:</span>
-                <span className="font-mono text-text-primary">{equipo.ultimoMant}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-tertiary">Próximo mant.:</span>
-                <span className={`font-mono ${equipo.proximoMant === 'Vencido' ? 'text-status-danger' : 'text-accent-yellow'}`}>
-                  {equipo.proximoMant}
-                </span>
-              </div>
-              <div className="w-full mt-3 flex gap-2">
-                <button
-                  onClick={() => setEquipoQR(equipo.nombre)}
-                  className="flex-1 px-2 py-1.5 bg-accent-yellow text-black rounded text-xs font-medium hover:bg-opacity-90"
-                >
-                  📱 QR
-                </button>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+      <Modal isOpen={Boolean(detailEquipo)} title={detailEquipo?.nombre || 'Detalle de equipo'} onClose={() => setDetailEquipo(null)}>
+        {detailEquipo && (
+          <div className="space-y-5">
+            <EquipmentImage equipo={detailEquipo} />
 
-      {/* Modal Detalles/Historial del Equipo */}
-      {historialEquipo && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setHistorialEquipo(null)}>
-          <div className="bg-dark-surface border border-dark-border rounded-lg p-6 max-w-md w-full fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <div className="text-lg font-bebas text-accent-yellow">
-                📋 {historialEquipo.nombre}
-              </div>
-              <button onClick={() => setHistorialEquipo(null)} className="text-xl text-text-tertiary hover:text-text-primary">✕</button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Info label="Tipo" value={detailEquipo.tipo || '-'} />
+              <Info label="Estado" value={(estadoBadge[detailEquipo.estado] || estadoBadge.operativo).label} />
+              <Info label="Ubicacion" value={detailEquipo.ubicacion || '-'} />
+              <Info label="Responsable" value={detailEquipo.responsable || '-'} />
+              <Info label="Fecha de compra" value={detailEquipo.fechaCompra || '-'} />
             </div>
 
-            <div className="space-y-3 text-sm mb-4">
-              <div className="flex justify-between border-b border-dark-border pb-2">
-                <span className="text-text-tertiary">Tipo:</span>
-                <span className="text-text-primary">{tipoIconos[historialEquipo.tipo]} {historialEquipo.tipo}</span>
-              </div>
-              <div className="flex justify-between border-b border-dark-border pb-2">
-                <span className="text-text-tertiary">Estado:</span>
-                <Badge
-                  label={(estadoBadge[historialEquipo.estado] || estadoBadge.operativo).label}
-                  type={(estadoBadge[historialEquipo.estado] || estadoBadge.operativo).type}
-                />
-              </div>
-              <div className="flex justify-between border-b border-dark-border pb-2">
-                <span className="text-text-tertiary">Ubicación:</span>
-                <span className="text-text-primary">{historialEquipo.ubicacion || '—'}</span>
-              </div>
-              <div className="flex justify-between border-b border-dark-border pb-2">
-                <span className="text-text-tertiary">Responsable:</span>
-                <span className="text-text-primary">{historialEquipo.responsable || '—'}</span>
-              </div>
-              <div className="flex justify-between border-b border-dark-border pb-2">
-                <span className="text-text-tertiary">Fecha de compra:</span>
-                <span className="font-mono text-text-primary">{historialEquipo.fechaCompra || '—'}</span>
-              </div>
-              {historialEquipo.observaciones && (
-                <div className="pt-2">
-                  <span className="text-text-tertiary text-xs uppercase font-mono">Observaciones:</span>
-                  <p className="text-text-secondary text-xs mt-1">{historialEquipo.observaciones}</p>
-                </div>
-              )}
+            <div className="rounded border border-dark-border bg-dark-surface2 p-4">
+              <div className="text-xs font-mono text-text-tertiary uppercase mb-2">Especificaciones tecnicas</div>
+              <SpecsList specs={detailEquipo.especificaciones} />
             </div>
 
-            <button
-              onClick={() => setHistorialEquipo(null)}
-              className="w-full px-3 py-2 bg-dark-surface3 text-text-primary text-xs font-medium rounded border border-dark-border hover:border-accent-yellow"
-            >
-              Cerrar
-            </button>
+            <div className="rounded border border-dark-border bg-dark-surface2 p-4">
+              <div className="text-xs font-mono text-text-tertiary uppercase mb-2">Documentacion adjunta</div>
+              <DocumentsList documentos={detailEquipo.documentos} />
+            </div>
+
+            {detailEquipo.observaciones && (
+              <div className="rounded border border-dark-border bg-dark-surface2 p-4">
+                <div className="text-xs font-mono text-text-tertiary uppercase mb-2">Observaciones</div>
+                <p className="text-sm text-text-secondary">{detailEquipo.observaciones}</p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
-      {/* Modal QR para Equipos */}
-      {equipoQR && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setEquipoQR(null)}>
-          <div className="bg-dark-surface border border-dark-border rounded-lg p-6 max-w-md w-full fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <div className="text-lg font-bebas text-accent-yellow">📱 Código QR - {equipoQR}</div>
-              <button onClick={() => setEquipoQR(null)} className="text-xl text-text-tertiary hover:text-text-primary">✕</button>
-            </div>
+      <Modal isOpen={showForm} title={editing ? 'Editar equipo' : 'Nuevo equipo'} onClose={() => setShowForm(false)}>
+        <EquipoForm initialData={editing} onSave={handleSave} onCancel={() => setShowForm(false)} />
+      </Modal>
+    </div>
+  );
+}
 
-            <div className="bg-white p-4 rounded-lg flex justify-center mb-4">
-              <div ref={qrRef}></div>
-            </div>
-
-            <div className="text-center text-xs text-text-secondary mb-4">
-              <div className="font-mono">{equipoQR}</div>
-              <div className="text-text-tertiary">Escanear para acceso a mantenimiento</div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (qrRef.current?.querySelector('canvas')) {
-                    const canvas = qrRef.current.querySelector('canvas') as HTMLCanvasElement;
-                    const link = document.createElement('a');
-                    link.href = canvas.toDataURL('image/png');
-                    link.download = `QR_${equipoQR}.png`;
-                    link.click();
-                  }
-                }}
-                className="flex-1 px-3 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
-              >
-                ⬇️ Descargar
-              </button>
-              <button
-                onClick={() => setEquipoQR(null)}
-                className="flex-1 px-3 py-2 bg-dark-surface3 text-text-primary text-xs font-medium rounded border border-dark-border"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-dark-border bg-dark-surface2 px-3 py-2">
+      <div className="text-[10px] font-mono text-text-tertiary uppercase">{label}</div>
+      <div className="text-sm text-text-primary mt-1 break-words">{value}</div>
     </div>
   );
 }

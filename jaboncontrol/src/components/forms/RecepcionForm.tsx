@@ -74,6 +74,7 @@ export function RecepcionForm({ onSave, onCancel }: RecepcionFormProps) {
             <option>Aceite quemado</option>
             <option>Aceite crudo</option>
             <option>Aceite almendra</option>
+            <option>Almendra podrida</option>
             <option>Agua</option>
             <option>Jabón reciclado</option>
           </select>

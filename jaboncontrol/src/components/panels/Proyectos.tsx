@@ -1,6 +1,10 @@
+import { useMemo, useState } from 'react';
 import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
+import { Modal } from '../common/Modal';
 import { useAppContext } from '../../context/AppContext';
+import { Proyecto } from '../../types';
+import { ProyectoForm } from '../forms/ProyectoForm';
 
 interface ProyectosProps {
   onNewClick?: () => void;
@@ -12,166 +16,193 @@ const estadoBadge: Record<string, { label: string; type: 'success' | 'warning' |
   completado: { label: 'Completado', type: 'success' },
 };
 
-export function Proyectos({ onNewClick }: ProyectosProps) {
-  const { proyectos, deleteProyecto } = useAppContext();
+export function Proyectos({}: ProyectosProps) {
+  const { proyectos, addProyecto, updateProyecto, deleteProyecto } = useAppContext();
+  const [editing, setEditing] = useState<Proyecto | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [filter, setFilter] = useState('todos');
 
-  const handleEliminar = (id: string, nombre: string) => {
-    if (confirm(`¿Eliminar el proyecto "${nombre}"?`)) {
+  const filtered = filter === 'todos' ? proyectos : proyectos.filter((p) => p.estado === filter);
+
+  const summary = useMemo(() => {
+    const active = proyectos.filter((p) => p.estado === 'activo').length;
+    const completed = proyectos.filter((p) => p.estado === 'completado').length;
+    const avg = proyectos.length
+      ? Math.round(proyectos.reduce((sum, p) => sum + (Number(p.progreso) || 0), 0) / proyectos.length)
+      : 0;
+    const budget = proyectos.reduce((sum, p) => sum + (Number(p.presupuesto) || 0), 0);
+    return { active, completed, avg, budget };
+  }, [proyectos]);
+
+  const openNew = () => {
+    setEditing(null);
+    setShowForm(true);
+  };
+
+  const handleSave = async (data: Proyecto) => {
+    if (editing) {
+      updateProyecto(editing.id, data);
+    } else {
+      addProyecto({ ...data, progreso: Number(data.progreso) || 0 });
+    }
+    setShowForm(false);
+    setEditing(null);
+  };
+
+  const handleEdit = (proyecto: Proyecto) => {
+    setEditing(proyecto);
+    setShowForm(true);
+  };
+
+  const handleDelete = (id: string, nombre: string) => {
+    if (confirm(`Eliminar el proyecto "${nombre}"?`)) {
       deleteProyecto(id);
     }
   };
 
+  const toggleTask = (proyecto: Proyecto, taskId: string) => {
+    const tareas = (proyecto.tareas || []).map((tarea) => (
+      tarea.id === taskId ? { ...tarea, completada: !tarea.completada } : tarea
+    ));
+    const completed = tareas.filter((tarea) => tarea.completada).length;
+    const progreso = tareas.length ? Math.round((completed / tareas.length) * 100) : proyecto.progreso;
+    updateProyecto(proyecto.id, {
+      ...proyecto,
+      tareas,
+      progreso,
+      estado: progreso === 100 ? 'completado' : proyecto.estado === 'completado' ? 'activo' : proyecto.estado,
+    });
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start mb-4 gap-2 flex-wrap">
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bebas tracking-wider">Proyectos en Marcha</h1>
-          <p className="text-xs font-mono text-text-tertiary mt-1">SEGUIMIENTO DE INICIATIVAS</p>
+          <h1 className="text-3xl font-bebas tracking-wider">Proyectos</h1>
+          <p className="text-xs font-mono text-text-tertiary mt-1">SEGUIMIENTO REAL DE INICIATIVAS, PRESUPUESTO Y AVANCE</p>
         </div>
         <button
-          onClick={onNewClick}
-          className="px-3 py-1.5 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
+          onClick={openNew}
+          className="px-4 py-2 bg-accent-yellow text-black text-xs font-semibold rounded hover:bg-opacity-90 w-fit"
         >
-          + Nuevo Proyecto
+          Nuevo proyecto
         </button>
       </div>
 
-      {/* MIS PROYECTOS REGISTRADOS */}
-      {proyectos.length === 0 ? (
-        <Card title="Mis Proyectos">
-          <div className="text-center py-8">
-            <div className="text-4xl mb-3">🏗️</div>
-            <p className="text-sm text-text-secondary mb-1">No hay proyectos registrados todavía</p>
-            <p className="text-xs text-text-tertiary mb-4">
-              Registra tus iniciativas para hacerles seguimiento
-            </p>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MiniStat label="Activos" value={summary.active} />
+        <MiniStat label="Completados" value={summary.completed} />
+        <MiniStat label="Avance promedio" value={`${summary.avg}%`} />
+        <MiniStat label="Presupuesto" value={`Bs ${summary.budget.toLocaleString('es-BO')}`} />
+      </div>
+
+      <Card title="Cartera de proyectos" badge={{ label: `${filtered.length} registros`, type: 'info' }}>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {['todos', 'activo', 'pausado', 'completado'].map((item) => (
             <button
-              onClick={onNewClick}
-              className="px-4 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
+              key={item}
+              onClick={() => setFilter(item)}
+              className={`px-3 py-1.5 rounded border text-sm ${
+                filter === item
+                  ? 'bg-accent-yellow text-black border-accent-yellow'
+                  : 'bg-dark-surface2 text-text-secondary border-dark-border hover:text-text-primary'
+              }`}
             >
-              + Crear mi primer proyecto
+              {item}
+            </button>
+          ))}
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="text-center py-12 border border-dashed border-dark-border rounded-lg">
+            <div className="text-sm text-text-secondary mb-2">No hay proyectos en esta vista.</div>
+            <button onClick={openNew} className="px-4 py-2 bg-accent-yellow text-black text-xs font-semibold rounded">
+              Crear proyecto
             </button>
           </div>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {proyectos.map((proyecto) => {
-            const badge = estadoBadge[proyecto.estado] || estadoBadge.activo;
-            return (
-              <Card key={proyecto.id} title={proyecto.nombre}>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-start gap-2 flex-wrap">
-                    <div>
-                      <p className="text-sm font-semibold text-text-primary">{proyecto.nombre}</p>
-                      {proyecto.descripcion && (
-                        <p className="text-xs text-text-secondary mt-1">{proyecto.descripcion}</p>
-                      )}
-                      <p className="text-xs text-text-tertiary font-mono mt-1">
-                        Inicio: {proyecto.fechaInicio}
-                        {proyecto.fechaFin && ` — Fin: ${proyecto.fechaFin}`}
-                        {proyecto.responsable && ` · Responsable: ${proyecto.responsable}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge label={badge.label} type={badge.type} />
-                      <button
-                        onClick={() => handleEliminar(proyecto.id, proyecto.nombre)}
-                        className="text-xs px-2 py-1 bg-dark-surface3 rounded border border-dark-border hover:border-status-danger hover:text-status-danger"
-                        title="Eliminar proyecto"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-dark-border">
+                  {['Proyecto', 'Responsable', 'Estado', 'Fechas', 'Presupuesto', 'Avance', 'Acciones'].map((h) => (
+                    <th key={h} className="text-left px-3 py-2 text-xs font-mono text-text-tertiary uppercase">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((proyecto) => {
+                  const badge = estadoBadge[proyecto.estado] || estadoBadge.activo;
+                  const tareas = proyecto.tareas || [];
+                  const hechas = tareas.filter((tarea) => tarea.completada).length;
+                  return (
+                    <tr key={proyecto.id} className="border-b border-dark-border hover:bg-dark-surface2 transition-colors align-top">
+                      <td className="px-3 py-3 min-w-80">
+                        <div className="font-medium text-text-primary">{proyecto.nombre}</div>
+                        <div className="text-xs text-text-tertiary max-w-md truncate">{proyecto.descripcion || 'Sin descripcion'}</div>
+                        {tareas.length > 0 && (
+                          <div className="mt-3 space-y-1.5">
+                            <div className="text-[10px] font-mono text-text-tertiary uppercase">
+                              To-do list: {hechas}/{tareas.length}
+                            </div>
+                            {tareas.slice(0, 5).map((tarea) => (
+                              <label key={tarea.id} className="flex items-start gap-2 text-xs text-text-secondary cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={tarea.completada}
+                                  onChange={() => toggleTask(proyecto, tarea.id)}
+                                  className="mt-0.5 accent-yellow-500"
+                                />
+                                <span className={tarea.completada ? 'line-through text-text-tertiary' : ''}>{tarea.texto}</span>
+                              </label>
+                            ))}
+                            {tareas.length > 5 && <div className="text-xs text-text-tertiary">+ {tareas.length - 5} tareas mas</div>}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-text-secondary">{proyecto.responsable || '-'}</td>
+                      <td className="px-3 py-3"><Badge label={badge.label} type={badge.type} /></td>
+                      <td className="px-3 py-3 font-mono text-xs text-text-secondary">
+                        {proyecto.fechaInicio || '-'}{proyecto.fechaFin ? ` / ${proyecto.fechaFin}` : ''}
+                      </td>
+                      <td className="px-3 py-3 font-mono text-text-secondary">Bs {(proyecto.presupuesto || 0).toLocaleString('es-BO')}</td>
+                      <td className="px-3 py-3 min-w-40">
+                        <div className="h-2 bg-dark-surface3 rounded overflow-hidden">
+                          <div className={proyecto.estado === 'completado' ? 'bg-status-success h-full' : 'bg-accent-yellow h-full'} style={{ width: `${Math.min(100, Number(proyecto.progreso) || 0)}%` }} />
+                        </div>
+                        <div className="text-xs font-mono text-text-tertiary mt-1">{proyecto.progreso || 0}%</div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex gap-2">
+                          <button onClick={() => handleEdit(proyecto)} className="px-2 py-1 rounded border border-dark-border text-accent-blue hover:border-accent-blue text-xs">Editar</button>
+                          <button onClick={() => handleDelete(proyecto.id, proyecto.nombre)} className="px-2 py-1 rounded border border-dark-border text-status-danger hover:border-status-danger text-xs">Eliminar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
-                  <div>
-                    <div className="w-full h-1 bg-dark-surface3 rounded overflow-hidden">
-                      <div
-                        className={proyecto.estado === 'completado' ? 'bg-status-success h-full' : 'bg-accent-yellow h-full'}
-                        style={{ width: `${proyecto.progreso || 0}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-text-tertiary font-mono mt-1">{proyecto.progreso || 0}% completado</p>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      <Modal isOpen={showForm} title={editing ? 'Editar proyecto' : 'Nuevo proyecto'} onClose={() => setShowForm(false)}>
+        <ProyectoForm
+          initialData={editing}
+          onSave={handleSave}
+          onCancel={() => setShowForm(false)}
+        />
+      </Modal>
+    </div>
+  );
+}
 
-      {/* PROYECTOS DE EJEMPLO */}
-      <div className="space-y-4">
-        <p className="text-xs font-mono text-text-tertiary uppercase tracking-wider">Ejemplos de referencia</p>
-        {[
-          {
-            nombre: 'Ampliación Línea de Producción — Compresora 2',
-            inicio: '15/04/2026',
-            fin: 'NE-PROJ-001',
-            progreso: 60,
-            estado: 'warning',
-            pasos: [
-              { desc: 'Cotización y selección de proveedor', done: true },
-              { desc: 'Aprobación presupuesto', done: true },
-              { desc: 'Obra civil (base de maquinaria)', done: true },
-              { desc: 'Instalación eléctrica', done: false },
-              { desc: 'Prueba de funcionamiento', done: false },
-            ]
-          },
-          {
-            nombre: 'Certificación Ambiental Municipal',
-            inicio: '02/05/2026',
-            fin: 'NE-PROJ-002',
-            progreso: 30,
-            estado: 'info',
-            pasos: [
-              { desc: 'Solicitud inicial presentada', done: true },
-              { desc: 'Inspección municipal', done: false },
-              { desc: 'Entrega de documentación técnica', done: false },
-              { desc: 'Aprobación final', done: false },
-            ]
-          },
-        ].map((proyecto) => (
-          <Card key={proyecto.nombre} title={proyecto.nombre.split(' ')[0]}>
-            <div className="space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-sm font-semibold text-text-primary">{proyecto.nombre}</p>
-                  <p className="text-xs text-text-tertiary font-mono mt-1">
-                    Iniciado: {proyecto.inicio} — {proyecto.fin}
-                  </p>
-                </div>
-                <Badge label={proyecto.estado === 'warning' ? 'En progreso' : 'En trámite'} type={proyecto.estado as 'warning' | 'info'} />
-              </div>
-
-              <div>
-                <div className="w-full h-1 bg-dark-surface3 rounded overflow-hidden">
-                  <div
-                    className={proyecto.estado === 'warning' ? 'bg-accent-yellow h-full' : 'bg-accent-blue h-full'}
-                    style={{ width: `${proyecto.progreso}%` }}
-                  />
-                </div>
-                <p className="text-xs text-text-tertiary font-mono mt-1">{proyecto.progreso}% completado</p>
-              </div>
-
-              <div className="space-y-2">
-                {proyecto.pasos.map((paso, idx) => (
-                  <div key={idx} className="flex items-center gap-3 text-xs">
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                      paso.done
-                        ? 'bg-status-success border-status-success text-black text-[10px]'
-                        : 'border-dark-border'
-                    }`}>
-                      {paso.done && '✓'}
-                    </div>
-                    <span className="text-text-secondary">{paso.desc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+function MiniStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="bg-dark-surface border border-dark-border rounded-lg p-4">
+      <div className="text-xs font-mono text-text-tertiary uppercase">{label}</div>
+      <div className="text-2xl font-bebas text-text-primary mt-1">{value}</div>
     </div>
   );
 }

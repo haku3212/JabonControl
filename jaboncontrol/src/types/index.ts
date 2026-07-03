@@ -56,6 +56,7 @@ export interface Cliente {
   nombre: string;
   tipo: 'distribuidor' | 'retailer' | 'consumidor-final';
   telefono: string;
+  email?: string;
   ciudad: string;
   direccion: string;
   ventaMes: number;

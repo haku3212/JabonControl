@@ -11,10 +11,13 @@ import { Acabado } from './components/panels/Acabado';
 import { Ventas } from './components/panels/Ventas';
 import { Cobros } from './components/panels/Cobros';
 import { Clientes } from './components/panels/Clientes';
+import { Finanzas } from './components/panels/Finanzas';
 import { Proyectos } from './components/panels/Proyectos';
 import { Documentacion } from './components/panels/Documentacion';
 import { Equipos } from './components/panels/Equipos';
 import { Reportes } from './components/panels/Reportes';
+import { Usuarios } from './components/panels/Usuarios';
+import { Auditoria } from './components/panels/Auditoria';
 import { VentaForm } from './components/forms/VentaForm';
 import { ClienteForm } from './components/forms/ClienteForm';
 import { HornadaForm } from './components/forms/HornadaForm';
@@ -24,6 +27,9 @@ import { ProyectoForm } from './components/forms/ProyectoForm';
 import { EquipoForm } from './components/forms/EquipoForm';
 import { DocumentoForm } from './components/forms/DocumentoForm';
 import { Recibo } from './components/Recibo';
+import { Login } from './components/Login';
+import { canAccessPanel, canCreateInPanel } from './utils/permissions';
+import { authService } from './services/api';
 
 const panelTitles: Record<string, [string, string]> = {
   dashboard: ['Dashboard', 'INICIO / DASHBOARD'],
@@ -33,10 +39,13 @@ const panelTitles: Record<string, [string, string]> = {
   ventas: ['Ventas', 'COMERCIAL / VENTAS'],
   cobros: ['Cobros', 'COMERCIAL / COBROS'],
   clientes: ['Clientes', 'COMERCIAL / CLIENTES'],
+  finanzas: ['Finanzas', 'FINANZAS / FLUJO DE CAJA'],
   proyectos: ['Proyectos', 'GESTIÓN / PROYECTOS'],
   documentacion: ['Documentación', 'GESTIÓN / DOCUMENTACIÓN'],
   equipos: ['Equipos', 'GESTIÓN / EQUIPOS'],
   reportes: ['Reportes', 'GESTIÓN / REPORTES'],
+  usuarios: ['Usuarios', 'ADMIN / USUARIOS'],
+  auditoria: ['Auditoria', 'ADMIN / HISTORIAL'],
 };
 
 const modalTitles: Record<string, string> = {
@@ -50,7 +59,7 @@ const modalTitles: Record<string, string> = {
   documento: 'Subir Documento',
 };
 
-function AppContent() {
+function AppContent({ user, onLogout }: { user: { id: string; nombre: string; usuario: string; rol: string }; onLogout?: () => void }) {
   const [activePanel, setActivePanel] = useState('dashboard');
   const [modalType, setModalType] = useState<string | null>(null);
   const [notification, setNotification] = useState('');
@@ -69,10 +78,18 @@ function AppContent() {
   }, []);
 
   const handleNavigate = (panel: string) => {
+    if (!canAccessPanel(user.rol, panel)) {
+      showNotificationMsg('No tienes permiso para abrir este modulo.');
+      return;
+    }
     setActivePanel(panel);
   };
 
   const handleNewClick = () => {
+    if (!canCreateInPanel(user.rol, activePanel)) {
+      showNotificationMsg('Tu rol no puede crear registros en este modulo.');
+      return;
+    }
     // Mapeo de panel activo a tipo de modal
     const panelToModal: Record<string, string> = {
       ventas: 'venta',
@@ -188,6 +205,8 @@ function AppContent() {
   };
 
   const [title, breadcrumb] = panelTitles[activePanel] || ['Dashboard', 'INICIO / DASHBOARD'];
+  const isAdmin = user.rol === 'admin';
+  const hasAccess = canAccessPanel(user.rol, activePanel);
 
   const panelComponents: Record<string, JSX.Element> = {
     dashboard: <Dashboard />,
@@ -197,10 +216,15 @@ function AppContent() {
     ventas: <Ventas onNewClick={() => setModalType('venta')} />,
     cobros: <Cobros onNewClick={() => setModalType('cobro')} />,
     clientes: <Clientes onNewClick={() => setModalType('cliente')} />,
-    proyectos: <Proyectos onNewClick={() => setModalType('proyecto')} />,
+    finanzas: <Finanzas />,
+    proyectos: <Proyectos />,
     documentacion: <Documentacion onNewClick={() => setModalType('documento')} />,
     equipos: <Equipos onNewClick={() => setModalType('equipo')} />,
     reportes: <Reportes />,
+    ...(isAdmin ? {
+      usuarios: <Usuarios />,
+      auditoria: <Auditoria />,
+    } : {}),
   };
 
   return (
@@ -222,7 +246,7 @@ function AppContent() {
             : 'static'
         } w-56 md:w-56`}
       >
-        <Sidebar activePanel={activePanel} onNavigate={(panel) => {
+        <Sidebar user={user} activePanel={activePanel} onNavigate={(panel) => {
           handleNavigate(panel);
           if (isMobile) setSidebarOpen(false);
         }} />
@@ -235,10 +259,18 @@ function AppContent() {
           onNewClick={handleNewClick}
           onMenuClick={() => setSidebarOpen(!sidebarOpen)}
           isMobile={isMobile}
+          onLogout={onLogout}
+          user={user}
+          canCreate={canCreateInPanel(user.rol, activePanel)}
         />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          {panelComponents[activePanel] || <Dashboard />}
+        {/* El padding baja en movil para aprovechar mejor el ancho disponible. */}
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
+          {hasAccess ? (panelComponents[activePanel] || <Dashboard />) : (
+            <div className="bg-dark-surface border border-dark-border rounded-lg p-8 text-center text-text-secondary">
+              No tienes permiso para ver este modulo.
+            </div>
+          )}
         </main>
       </div>
 
@@ -313,9 +345,31 @@ function AppContent() {
 }
 
 export function App() {
+  const [user, setUser] = useState<{ id: string; nombre: string; usuario: string; rol: string } | null>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('jc_user') || 'null');
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // Aunque el backend no responda, cerramos la sesion visualmente en este navegador.
+    }
+    localStorage.removeItem('jc_user');
+    setUser(null);
+  };
+
+  if (!user) {
+    return <Login onLogin={setUser} />;
+  }
+
   return (
     <AppProvider>
-      <AppContent />
+      <AppContent user={user} onLogout={handleLogout} />
     </AppProvider>
   );
 }

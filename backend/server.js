@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const initDB = require('./db');
 
@@ -12,12 +13,57 @@ const clientesRoutes = require('./routes/clientes');
 const hornadasRoutes = require('./routes/hornadas');
 const materiasRoutes = require('./routes/materias');
 const usuariosRoutes = require('./routes/usuarios');
+const finanzasRoutes = require('./routes/finanzas');
+const { verifyToken, requireAdmin, requireRoles } = require('./routes/auth');
+const dbModule = require('./db');
+const crypto = require('crypto');
 
 const app = express();
 
+// Lista de origenes permitidos; en desarrollo acepta localhost y 127.0.0.1.
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://127.0.0.1:5173,http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 // Middleware
-app.use(cors());
-app.use(express.json());
+// Helmet agrega headers HTTP defensivos siguiendo buenas practicas OWASP.
+app.use(helmet({
+  // En desarrollo mantenemos CSP flexible; en produccion se activa una politica estricta.
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'", ...allowedOrigins],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+  } : false,
+  // HSTS solo tiene sentido detras de HTTPS en produccion.
+  hsts: process.env.NODE_ENV === 'production',
+}));
+
+// CORS ya no queda abierto a cualquier origen; valida contra allowedOrigins.
+app.use(cors({
+  origin(origin, callback) {
+    // Permite requests sin Origin, como curl/Postman/local health checks.
+    if (!origin) return callback(null, true);
+
+    // Acepta solo origenes configurados.
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // Rechaza origenes externos no esperados.
+    return callback(new Error('Origen no permitido por CORS'));
+  },
+  credentials: true,
+}));
+
+// Limita el tamano del JSON para reducir riesgo de abuso/DoS por payloads grandes.
+app.use(express.json({ limit: '1mb' }));
 
 // Servir archivos estáticos del frontend
 app.use(express.static(path.join(__dirname, 'public')));
@@ -29,12 +75,68 @@ app.get('/api/health', (req, res) => {
 
 // Rutas
 app.use('/api/auth', authRoutes);
-app.use('/api/ventas', ventasRoutes);
-app.use('/api/cobros', cobrosRoutes);
-app.use('/api/clientes', clientesRoutes);
-app.use('/api/hornadas', hornadasRoutes);
-app.use('/api/materias', materiasRoutes);
-app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/ventas', verifyToken, ventasRoutes);
+app.use('/api/cobros', verifyToken, requireRoles('admin', 'supervisor'), cobrosRoutes);
+app.use('/api/clientes', verifyToken, clientesRoutes);
+app.use('/api/hornadas', verifyToken, hornadasRoutes);
+app.use('/api/materias', verifyToken, materiasRoutes);
+app.use('/api/finanzas', verifyToken, requireRoles('admin', 'supervisor'), finanzasRoutes);
+app.use('/api/usuarios', verifyToken, requireAdmin, usuariosRoutes);
+app.get('/api/auditoria', verifyToken, requireAdmin, (req, res) => {
+  try {
+    const db = dbModule.db.get();
+    const result = db.exec('SELECT * FROM audit_logs ORDER BY creado_en DESC, rowid DESC LIMIT 250');
+    if (result.length === 0) return res.json([]);
+    const columns = result[0].columns;
+    const rows = result[0].values.map((row) => {
+      const obj = {};
+      columns.forEach((col, idx) => {
+        obj[col] = row[idx];
+      });
+      return obj;
+    });
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+app.get('/api/auditoria/integridad', verifyToken, requireAdmin, (req, res) => {
+  try {
+    const db = dbModule.db.get();
+    const result = db.exec('SELECT * FROM audit_logs ORDER BY creado_en ASC, rowid ASC');
+    if (result.length === 0) return res.json({ ok: true, total: 0, errores: [] });
+    const columns = result[0].columns;
+    let previousHash = '';
+    const errores = [];
+    result[0].values.forEach((row, index) => {
+      const log = {};
+      columns.forEach((col, idx) => {
+        log[col] = row[idx];
+      });
+      const payload = [
+        log.id,
+        log.usuario_id || '',
+        log.usuario || 'sistema',
+        log.rol || '',
+        log.accion,
+        log.tabla,
+        log.registro_id || '',
+        log.detalle || '',
+        log.valores_anteriores || '',
+        log.valores_nuevos || '',
+        log.hash_anterior || '',
+      ].join('|');
+      const expected = crypto.createHash('sha256').update(payload).digest('hex');
+      if ((log.hash_anterior || '') !== previousHash || (log.hash_evento || '') !== expected) {
+        errores.push({ posicion: index + 1, id: log.id, tabla: log.tabla, accion: log.accion });
+      }
+      previousHash = log.hash_evento || '';
+    });
+    res.json({ ok: errores.length === 0, total: result[0].values.length, errores });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Fallback para React Router - servir index.html para rutas no API
 app.use((req, res, next) => {
@@ -47,8 +149,12 @@ app.use((req, res, next) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  // Log interno para diagnostico del servidor.
   console.error(err.stack);
-  res.status(500).json({ error: err.message });
+
+  // En produccion no exponemos detalles tecnicos al cliente.
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.status(500).json({ error: isProduction ? 'Error interno del servidor' : err.message });
 });
 
 // Inicializar y arrancar

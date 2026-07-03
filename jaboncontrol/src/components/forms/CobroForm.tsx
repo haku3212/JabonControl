@@ -1,6 +1,7 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { useAppContext } from '../../context/AppContext';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import QRCode from 'qrcode';
+import { useAppContext } from '../../context/AppContext';
 
 interface CobroFormProps {
   onSave: (data: any) => Promise<void>;
@@ -8,137 +9,226 @@ interface CobroFormProps {
 }
 
 export function CobroForm({ onSave, onCancel }: CobroFormProps) {
+  // ventas contiene las notas de entrega; clientes contiene el directorio general.
   const { ventas, clientes } = useAppContext();
+
+  // Guarda el cliente seleccionado para calcular sus deudas pendientes.
   const [clienteSeleccionado, setClienteSeleccionado] = useState('');
+
+  // Guarda el monto que se aplicara contra las deudas del cliente.
   const [monto, setMonto] = useState(0);
+
+  // Guarda el metodo usado para el pago.
   const [metodoPago, setMetodoPago] = useState('efectivo');
+
+  // Guarda la fecha administrativa del cobro.
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+
+  // Evita que el usuario envie el formulario dos veces mientras guarda.
   const [loading, setLoading] = useState(false);
+
+  // Referencia del contenedor donde se dibuja el QR de pago.
   const qrRef = useRef<HTMLDivElement>(null);
 
-  // Generar datos del QR cuando cambian monto o cliente
-  const datosQR = `BANCO|${monto}|${clienteSeleccionado}-${fecha}`;
+  // Calcula el saldo real de una venta; si no existe saldoPendiente, usa el total solo cuando es credito.
+  const getSaldoVenta = (venta: any) => (
+    venta.saldoPendiente ?? (venta.tipoPago === 'credito' ? (venta.total || venta.precioTotal || 0) : 0)
+  );
 
-  // Generar QR cuando selecciona opción QR
-  useEffect(() => {
-    if (qrRef.current && metodoPago === 'qr' && monto > 0) {
-      qrRef.current.innerHTML = '';
-      QRCode.toCanvas(qrRef.current, datosQR, {
-        width: 250,
-        margin: 2,
-        color: { dark: '#000000', light: '#FFFFFF' },
-      }).catch((err: unknown) => console.error('Error QR:', err));
-    }
-  }, [datosQR, metodoPago, monto]);
+  // Lista solo clientes con deuda pendiente; esto evita cobrar a clientes que ya estan al dia.
+  const clientesConDeuda = useMemo(() => {
+    // Recolectamos nombres de clientes que tienen al menos una venta con saldo positivo.
+    const nombresConDeuda = new Set(
+      ventas
+        .filter((venta) => getSaldoVenta(venta) > 0)
+        .map((venta) => venta.cliente)
+    );
 
-  // Calcular deudas por cliente (FIFO)
+    // Mostramos clientes registrados que coinciden con esos nombres.
+    return clientes.filter((cliente) => nombresConDeuda.has(cliente.nombre));
+  }, [clientes, ventas]);
+
+  // Calcula las deudas de un cliente en orden FIFO: primero las mas antiguas.
   const deudasCliente = useMemo(() => {
+    // Sin cliente seleccionado no hay nada que distribuir.
     if (!clienteSeleccionado) return [];
 
+    // Filtramos ventas del cliente que todavia tengan saldo.
     const ventasCliente = ventas
-      .filter((v) => v.cliente === clienteSeleccionado)
+      .filter((venta) => venta.cliente === clienteSeleccionado && getSaldoVenta(venta) > 0)
       .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
 
-    return ventasCliente.map((v) => ({
-      id: v.id,
-      numeroNE: v.numeroNE,
-      fecha: v.fecha,
-      original: v.total,
-      resto: v.total,
+    // Normalizamos cada deuda con los campos necesarios para mostrar y aplicar pagos.
+    return ventasCliente.map((venta) => ({
+      id: venta.id,
+      numeroNE: venta.numeroNE,
+      fecha: venta.fecha,
+      original: venta.total || venta.precioTotal || 0,
+      resto: getSaldoVenta(venta),
     }));
   }, [clienteSeleccionado, ventas]);
 
-  // Calcular distribución FIFO
+  // Distribuye el monto ingresado contra las deudas FIFO.
   const distribucion = useMemo(() => {
+    // No se distribuye nada si el monto no es valido o el cliente no debe.
     if (monto <= 0 || deudasCliente.length === 0) return [];
 
+    // restante va disminuyendo conforme se aplica a cada deuda.
     let restante = monto;
-    const dist = deudasCliente.map((deuda) => {
-      const deudaResto = deuda.resto || 0;
-      const aplicar = Math.min(restante, deudaResto);
-      restante = Math.round((restante - aplicar) * 100) / 100;
+
+    // Aplicamos primero las deudas mas antiguas.
+    return deudasCliente.map((deuda) => {
+      // Calculamos cuanto se puede aplicar a esta deuda.
+      const aplicado = Math.min(restante, deuda.resto || 0);
+
+      // Redondeamos para evitar decimales flotantes raros.
+      restante = Math.round((restante - aplicado) * 100) / 100;
+
+      // Devolvemos la linea de aplicacion.
       return {
         ...deuda,
-        aplicado: aplicar,
-        saldada: aplicar >= deudaResto,
+        aplicado,
+        saldada: aplicado >= (deuda.resto || 0),
       };
     });
-
-    return dist;
   }, [monto, deudasCliente]);
 
-  const totalAplicado = distribucion.reduce((s, d) => s + d.aplicado, 0);
+  // Total que realmente se aplica a deudas.
+  const totalAplicado = distribucion.reduce((sum, item) => sum + item.aplicado, 0);
+
+  // Excedente si el usuario cobra mas de lo adeudado.
   const excedente = Math.round((monto - totalAplicado) * 100) / 100;
 
+  // Texto codificado para el QR local de pago.
+  const datosQR = `BANCO|${monto}|${clienteSeleccionado}-${fecha}`;
+
+  // Dibuja el QR cuando el metodo es QR y hay monto valido.
+  useEffect(() => {
+    // Si no hay contenedor, no hacemos nada.
+    if (!qrRef.current) return;
+
+    // Solo generamos QR cuando el usuario eligio ese metodo.
+    if (metodoPago !== 'qr' || monto <= 0) return;
+
+    // Limpiamos el QR anterior antes de dibujar uno nuevo.
+    qrRef.current.innerHTML = '';
+
+    // Generamos el canvas del QR.
+    QRCode.toCanvas(qrRef.current, datosQR, {
+      width: 250,
+      margin: 2,
+      color: { dark: '#000000', light: '#FFFFFF' },
+    }).catch((error: unknown) => console.error('Error QR:', error));
+  }, [datosQR, metodoPago, monto]);
+
+  // Envia el cobro al contexto/app.
   const handleSubmit = async () => {
+    // Validamos que el usuario haya elegido un cliente deudor y un monto positivo.
     if (!clienteSeleccionado || monto <= 0) {
-      alert('Por favor seleccione cliente e ingrese monto');
+      alert('Seleccione un cliente con deuda e ingrese un monto valido.');
       return;
     }
 
+    // No permitimos registrar cobros sin deudas.
+    if (deudasCliente.length === 0) {
+      alert('Este cliente no tiene deuda pendiente.');
+      return;
+    }
+
+    // Activamos loading para bloquear doble click.
     setLoading(true);
+
     try {
-      const deudas = distribucion
-        .filter((d) => d.aplicado > 0)
-        .map((d) => d.numeroNE)
+      // Armamos la lista de notas de entrega afectadas.
+      const notas = distribucion
+        .filter((item) => item.aplicado > 0)
+        .map((item) => item.numeroNE)
         .join(', ');
 
+      // Guardamos el cobro con su distribucion FIFO.
       await onSave({
         id: Date.now().toString(),
         fecha,
         cliente: clienteSeleccionado,
         montoCobrado: monto,
         metodoPago,
-        notasCorrespondientes: deudas,
-        distribucion: distribucion.filter((d) => d.aplicado > 0),
+        notasCorrespondientes: notas,
+        distribucion: distribucion.filter((item) => item.aplicado > 0),
       });
     } catch (error) {
+      // Mostramos error amigable y dejamos detalle en consola.
       alert('Error al guardar el cobro');
       console.error(error);
     } finally {
+      // Siempre liberamos el formulario.
       setLoading(false);
     }
   };
 
+  // Descarga el QR actual como PNG.
+  const downloadQR = () => {
+    // Buscamos el canvas generado por qrcode.
+    const canvas = qrRef.current?.querySelector('canvas') as HTMLCanvasElement | null;
+
+    // Si aun no hay canvas, salimos sin error.
+    if (!canvas) return;
+
+    // Creamos un enlace temporal de descarga.
+    const link = document.createElement('a');
+
+    // Convertimos el canvas a imagen PNG.
+    link.href = canvas.toDataURL('image/png');
+
+    // Nombramos el archivo con cliente y fecha.
+    link.download = `QR_${clienteSeleccionado}_${fecha}.png`;
+
+    // Ejecutamos la descarga.
+    link.click();
+  };
+
   return (
     <div className="space-y-4">
-      {/* Selector de cliente */}
       <div>
         <label className="text-xs font-mono text-text-tertiary uppercase block mb-2">
-          Seleccionar Cliente
+          Clientes con deuda pendiente
         </label>
         <select
           value={clienteSeleccionado}
-          onChange={(e) => setClienteSeleccionado(e.target.value)}
+          onChange={(event) => setClienteSeleccionado(event.target.value)}
           className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
         >
-          <option value="">— Elegir cliente —</option>
-          {clientes.map((c) => (
-            <option key={c.id} value={c.nombre}>
-              {c.nombre}
+          <option value="">Elegir cliente deudor</option>
+          {clientesConDeuda.map((cliente) => (
+            <option key={cliente.id} value={cliente.nombre}>
+              {cliente.nombre}
             </option>
           ))}
         </select>
+
+        {clientesConDeuda.length === 0 && (
+          <div className="mt-2 rounded border border-dark-border bg-dark-surface2 px-3 py-2 text-xs text-text-tertiary">
+            No hay clientes con deuda pendiente para registrar cobros.
+          </div>
+        )}
       </div>
 
-      {/* Deudas pendientes */}
       {clienteSeleccionado && deudasCliente.length > 0 && (
         <div className="bg-dark-surface2 p-4 rounded">
           <div className="text-xs font-mono text-text-tertiary uppercase mb-3">
-            Deudas Pendientes (FIFO)
+            Deudas pendientes FIFO
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto">
-            {deudasCliente.map((deuda, idx) => (
-              <div
-                key={deuda.id}
-                className="flex items-center justify-between p-2 bg-dark-surface border border-dark-border rounded text-xs"
-              >
+            {deudasCliente.map((deuda, index) => (
+              <div key={deuda.id} className="flex items-center justify-between p-2 bg-dark-surface border border-dark-border rounded text-xs">
                 <div>
                   <div className="font-mono font-semibold text-text-primary">
-                    {idx + 1}. {deuda.numeroNE}
+                    {index + 1}. {deuda.numeroNE}
                   </div>
-                  <div className="text-text-tertiary text-10px">
-                    {deuda.fecha} · Bs {(deuda.original || 0).toLocaleString()}
+                  <div className="text-text-tertiary">
+                    {deuda.fecha} - Debe: <span className="text-accent-yellow">Bs {(deuda.resto || 0).toLocaleString()}</span>
+                    {deuda.resto < deuda.original && (
+                      <span> de Bs {(deuda.original || 0).toLocaleString()}</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -147,59 +237,52 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
         </div>
       )}
 
-      {/* Formulario de pago */}
       {clienteSeleccionado && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-          <div>
-            <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">
-              Monto a Pagar (Bs) *
-            </label>
+          <Field label="Monto a pagar (Bs) *">
             <input
               type="number"
               step="0.01"
               value={monto || ''}
-              onChange={(e) => setMonto(Number(e.target.value))}
+              onChange={(event) => setMonto(Number(event.target.value))}
               placeholder="0.00"
               className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-accent-yellow text-sm font-semibold focus:border-accent-yellow outline-none"
             />
-          </div>
-          <div>
-            <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">
-              Método de Pago
-            </label>
+          </Field>
+
+          <Field label="Metodo de pago">
             <select
               value={metodoPago}
-              onChange={(e) => setMetodoPago(e.target.value)}
+              onChange={(event) => setMetodoPago(event.target.value)}
               className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
             >
-              <option value="efectivo">💵 Efectivo</option>
-              <option value="transferencia">🏦 Transferencia</option>
-              <option value="qr">📱 QR Banco</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="qr">QR Banco</option>
             </select>
-          </div>
-          <div className="col-span-1 sm:col-span-2">
-            <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">
-              Fecha del Cobro
-            </label>
-            <input
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-              className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
-            />
+          </Field>
+
+          <div className="sm:col-span-2">
+            <Field label="Fecha del cobro">
+              <input
+                type="date"
+                value={fecha}
+                onChange={(event) => setFecha(event.target.value)}
+                className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+              />
+            </Field>
           </div>
         </div>
       )}
 
-      {/* QR INTEGRADO - Cuando selecciona "QR Banco" */}
-      {metodoPago === 'qr' && monto > 0 && (
+      {metodoPago === 'qr' && monto > 0 && clienteSeleccionado && (
         <div className="bg-dark-surface2 p-6 rounded border-2 border-accent-yellow border-opacity-50">
           <div className="text-xs font-mono text-text-tertiary uppercase mb-3 text-center">
-            📱 Código QR Banco - Escanear para Pagar
+            Codigo QR Banco
           </div>
           <div className="flex flex-col items-center gap-4">
             <div className="bg-white p-4 rounded-lg shadow-lg">
-              <div ref={qrRef} className="flex justify-center"></div>
+              <div ref={qrRef} className="flex justify-center" />
             </div>
             <div className="text-center w-full">
               <div className="text-sm text-text-secondary mb-2">
@@ -212,85 +295,66 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
                 Fecha: {fecha}
               </div>
             </div>
-            <button
-              onClick={() => {
-                if (qrRef.current?.querySelector('canvas')) {
-                  const canvas = qrRef.current.querySelector('canvas') as HTMLCanvasElement;
-                  const link = document.createElement('a');
-                  link.href = canvas.toDataURL('image/png');
-                  link.download = `QR_${clienteSeleccionado}_${fecha}.png`;
-                  link.click();
-                }
-              }}
-              className="w-full px-3 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
-            >
-              ⬇️ Descargar QR
+            <button onClick={downloadQR} className="w-full px-3 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90">
+              Descargar QR
             </button>
           </div>
         </div>
       )}
 
-      {/* Preview distribución FIFO */}
       {distribucion.length > 0 && monto > 0 && (
         <div className="bg-dark-surface2 p-4 rounded">
           <div className="text-xs font-mono text-text-tertiary uppercase mb-3">
-            Distribución Automática FIFO
+            Distribucion automatica FIFO
           </div>
           <div className="space-y-2 text-xs">
-            {distribucion.map((d) =>
-              d.aplicado > 0 ? (
-                <div
-                  key={d.id}
-                  className="flex justify-between items-center p-2 bg-dark-surface rounded border border-accent-yellow border-opacity-30"
-                >
-                  <span className="text-text-secondary">
-                    {d.numeroNE} ({d.fecha})
-                  </span>
-                  <span
-                    className={`font-mono font-semibold ${
-                      d.saldada ? 'text-status-success' : 'text-accent-yellow'
-                    }`}
-                  >
-                    − Bs {d.aplicado.toLocaleString()} {d.saldada ? '✓' : '(abono)'}
+            {distribucion.map((item) => (
+              item.aplicado > 0 ? (
+                <div key={item.id} className="flex justify-between items-center p-2 bg-dark-surface rounded border border-accent-yellow border-opacity-30">
+                  <span className="text-text-secondary">{item.numeroNE} ({item.fecha})</span>
+                  <span className={`font-mono font-semibold ${item.saldada ? 'text-status-success' : 'text-accent-yellow'}`}>
+                    - Bs {item.aplicado.toLocaleString()} {item.saldada ? 'saldada' : 'abono'}
                   </span>
                 </div>
               ) : null
-            )}
+            ))}
+
             {excedente > 0 && (
               <div className="flex justify-between items-center p-2 bg-dark-surface rounded border border-accent-blue border-opacity-30">
-                <span className="text-text-secondary">Vuelto/Excedente</span>
-                <span className="font-mono font-semibold text-accent-blue">
-                  Bs {excedente.toLocaleString()}
-                </span>
+                <span className="text-text-secondary">Vuelto / excedente</span>
+                <span className="font-mono font-semibold text-accent-blue">Bs {excedente.toLocaleString()}</span>
               </div>
             )}
+
             <div className="flex justify-between items-center p-2 border-t border-dark-border mt-2 pt-2">
-              <span className="font-semibold text-text-primary">Total Aplicado</span>
-              <span className="font-mono font-semibold text-status-success">
-                Bs {totalAplicado.toLocaleString()}
-              </span>
+              <span className="font-semibold text-text-primary">Total aplicado</span>
+              <span className="font-mono font-semibold text-status-success">Bs {totalAplicado.toLocaleString()}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Botones */}
       <div className="flex justify-end gap-2 pt-4 border-t border-dark-border">
-        <button
-          onClick={onCancel}
-          disabled={loading}
-          className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow disabled:opacity-50"
-        >
+        <button onClick={onCancel} disabled={loading} className="px-4 py-2 bg-dark-surface3 text-text-primary text-sm font-medium rounded border border-dark-border hover:border-accent-yellow disabled:opacity-50">
           Cancelar
         </button>
         <button
           onClick={handleSubmit}
-          disabled={!clienteSeleccionado || monto <= 0 || loading}
+          disabled={!clienteSeleccionado || monto <= 0 || deudasCliente.length === 0 || loading}
           className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? '⏳ Guardando...' : '✓ Confirmar Cobro'}
+          {loading ? 'Guardando...' : 'Confirmar cobro'}
         </button>
       </div>
     </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">{label}</span>
+      {children}
+    </label>
   );
 }
