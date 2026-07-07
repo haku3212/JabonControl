@@ -101,6 +101,17 @@ export interface Stock {
   maximo: number;
 }
 
+export interface RegistroAcabado {
+  id: string;
+  fecha: string;
+  area: 'compresora' | 'sellado';
+  operarios: string;
+  piezas: number;
+  bandejas: number;
+  kilos: number;
+  observaciones: string;
+}
+
 export interface DocumentoApp {
   id: string;
   nombre: string;

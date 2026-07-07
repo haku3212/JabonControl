@@ -14,6 +14,7 @@ const hornadasRoutes = require('./routes/hornadas');
 const materiasRoutes = require('./routes/materias');
 const usuariosRoutes = require('./routes/usuarios');
 const finanzasRoutes = require('./routes/finanzas');
+const createAppRecordsRouter = require('./routes/appRecords');
 const { verifyToken, requireAdmin, requireRoles } = require('./routes/auth');
 const dbModule = require('./db');
 const crypto = require('crypto');
@@ -81,38 +82,26 @@ app.use('/api/clientes', verifyToken, clientesRoutes);
 app.use('/api/hornadas', verifyToken, hornadasRoutes);
 app.use('/api/materias', verifyToken, materiasRoutes);
 app.use('/api/finanzas', verifyToken, requireRoles('admin', 'supervisor'), finanzasRoutes);
+app.use('/api/proyectos', verifyToken, createAppRecordsRouter('proyectos'));
+app.use('/api/documentos', verifyToken, createAppRecordsRouter('documentos'));
+app.use('/api/equipos', verifyToken, createAppRecordsRouter('equipos'));
+app.use('/api/acabado', verifyToken, createAppRecordsRouter('acabado'));
 app.use('/api/usuarios', verifyToken, requireAdmin, usuariosRoutes);
-app.get('/api/auditoria', verifyToken, requireAdmin, (req, res) => {
+app.get('/api/auditoria', verifyToken, requireAdmin, async (req, res) => {
   try {
-    const db = dbModule.db.get();
-    const result = db.exec('SELECT * FROM audit_logs ORDER BY creado_en DESC, rowid DESC LIMIT 250');
-    if (result.length === 0) return res.json([]);
-    const columns = result[0].columns;
-    const rows = result[0].values.map((row) => {
-      const obj = {};
-      columns.forEach((col, idx) => {
-        obj[col] = row[idx];
-      });
-      return obj;
-    });
+    const rows = await dbModule.all('SELECT * FROM audit_logs ORDER BY creado_en DESC LIMIT 250');
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
-app.get('/api/auditoria/integridad', verifyToken, requireAdmin, (req, res) => {
+app.get('/api/auditoria/integridad', verifyToken, requireAdmin, async (req, res) => {
   try {
-    const db = dbModule.db.get();
-    const result = db.exec('SELECT * FROM audit_logs ORDER BY creado_en ASC, rowid ASC');
-    if (result.length === 0) return res.json({ ok: true, total: 0, errores: [] });
-    const columns = result[0].columns;
+    const rows = await dbModule.all('SELECT * FROM audit_logs ORDER BY creado_en ASC');
+    if (rows.length === 0) return res.json({ ok: true, total: 0, errores: [] });
     let previousHash = '';
     const errores = [];
-    result[0].values.forEach((row, index) => {
-      const log = {};
-      columns.forEach((col, idx) => {
-        log[col] = row[idx];
-      });
+    rows.forEach((log, index) => {
       const payload = [
         log.id,
         log.usuario_id || '',
@@ -132,7 +121,7 @@ app.get('/api/auditoria/integridad', verifyToken, requireAdmin, (req, res) => {
       }
       previousHash = log.hash_evento || '';
     });
-    res.json({ ok: errores.length === 0, total: result[0].values.length, errores });
+    res.json({ ok: errores.length === 0, total: rows.length, errores });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

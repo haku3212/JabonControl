@@ -18,6 +18,15 @@ const metodoLabel: Record<string, string> = {
   cheque: 'Cheque',
 };
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export function Recibo({
   cliente,
   montoCobrado,
@@ -56,17 +65,62 @@ export function Recibo({
     const printWindow = window.open('', '', 'height=700,width=900');
     if (!printWindow) return;
 
+    const fechaPago = new Date(fecha).toLocaleDateString('es-BO');
+    const metodo = metodoLabel[metodoPago] || metodoPago;
+    const generado = new Date().toLocaleString('es-BO');
+
     printWindow.document.write(`
       <html>
         <head>
           <title>Recibo ${numeroRecibo}</title>
           <style>
             body { margin: 0; padding: 24px; background: #f5f7fa; font-family: Arial, sans-serif; }
-            .recibo-print { max-width: 760px; margin: 0 auto; }
+            .recibo-print { max-width: 760px; margin: 0 auto; background: white; color: #0f172a; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+            .header { background: #020617; color: white; padding: 24px 32px; display: flex; justify-content: space-between; gap: 24px; }
+            .title { font-size: 30px; letter-spacing: 1px; font-weight: 700; }
+            .muted { color: #64748b; font-size: 12px; }
+            .header .muted { color: #cbd5e1; }
+            .body { padding: 28px 32px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+            .box { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 6px; padding: 12px 16px; }
+            .label { color: #64748b; font-size: 11px; text-transform: uppercase; }
+            .value { margin-top: 4px; font-weight: 700; word-break: break-word; }
+            .amount { margin: 24px 0; border: 1px solid #a7f3d0; background: #ecfdf5; border-radius: 6px; padding: 20px; text-align: center; color: #047857; }
+            .amount strong { display: block; font-size: 36px; margin-top: 4px; }
+            .signature { display: grid; grid-template-columns: 1fr 180px; gap: 24px; align-items: end; padding-top: 28px; }
+            .line { border-top: 1px solid #94a3b8; padding-top: 8px; text-align: center; font-size: 12px; color: #475569; }
+            .footer { border-top: 1px solid #e2e8f0; margin-top: 24px; padding-top: 12px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
             @media print { body { background: white; padding: 0; } }
           </style>
         </head>
-        <body><div class="recibo-print">${reciboRef.current.innerHTML}</div></body>
+        <body>
+          <div class="recibo-print">
+            <div class="header">
+              <div>
+                <div class="title">RECIBO DE PAGO</div>
+                <div class="muted">Constancia de cobro recibido</div>
+              </div>
+              <div style="text-align:right">
+                <div class="muted">RECIBO</div>
+                <div style="color:#fcd34d;font-weight:700">${escapeHtml(numeroRecibo)}</div>
+              </div>
+            </div>
+            <div class="body">
+              <div class="grid">
+                <div class="box"><div class="label">Cliente</div><div class="value">${escapeHtml(cliente)}</div></div>
+                <div class="box"><div class="label">Fecha de pago</div><div class="value">${escapeHtml(fechaPago)}</div></div>
+                <div class="box"><div class="label">Metodo</div><div class="value">${escapeHtml(metodo)}</div></div>
+                <div class="box"><div class="label">Notas de entrega</div><div class="value">${escapeHtml(notasCorrespondientes || '-')}</div></div>
+              </div>
+              <div class="amount"><div class="label" style="color:#047857">Monto pagado</div><strong>Bs ${escapeHtml(monto)}</strong></div>
+              <div class="signature">
+                <div class="muted">Documento generado por JabonControl. Conserve este recibo como respaldo del pago registrado.</div>
+                <div class="line">Recibido por</div>
+              </div>
+              <div class="footer"><span>JabonControl - Sistema de Gestion de Jaboneria</span><span>${escapeHtml(generado)}</span></div>
+            </div>
+          </div>
+        </body>
       </html>
     `);
     printWindow.document.close();

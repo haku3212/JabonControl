@@ -171,3 +171,25 @@ export const finanzasService = {
     return apiClient.delete(`/finanzas/movimientos/${id}`);
   },
 };
+
+function createCrudService(basePath: string) {
+  return {
+    async listar() {
+      return apiClient.get(basePath);
+    },
+    async crear(data: any) {
+      return apiClient.post(basePath, data);
+    },
+    async actualizar(id: string, data: any) {
+      return apiClient.put(`${basePath}/${id}`, data);
+    },
+    async eliminar(id: string) {
+      return apiClient.delete(`${basePath}/${id}`);
+    },
+  };
+}
+
+export const proyectosService = createCrudService('/proyectos');
+export const documentosService = createCrudService('/documentos');
+export const equiposService = createCrudService('/equipos');
+export const acabadoService = createCrudService('/acabado');

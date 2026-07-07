@@ -10,7 +10,16 @@ import {
   DocumentoApp,
   EquipoApp,
 } from '../types';
-import { ventasService, clientesService, hornadasService, cobrosService, materiasService } from '../services/api';
+import {
+  ventasService,
+  clientesService,
+  hornadasService,
+  cobrosService,
+  materiasService,
+  proyectosService,
+  documentosService,
+  equiposService,
+} from '../services/api';
 
 interface AppContextType {
   // Data
@@ -306,55 +315,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ventas, setVentas] = useState<Venta[]>(initialVentas);
   const [cobros, setCobros] = useState<Cobro[]>(initialCobros);
   const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
-  const [proyectos, setProyectos] = useState<Proyecto[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('jc_proyectos') || '[]');
-      return mergeDemo(saved, demoProyectos);
-    } catch { return demoProyectos; }
-  });
+  const [proyectos, setProyectos] = useState<Proyecto[]>(demoProyectos);
   const [stocks] = useState<Stock[]>([]);
-  const [documentos, setDocumentos] = useState<DocumentoApp[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('jc_documentos') || '[]');
-      return mergeDemo(saved, demoDocumentos);
-    } catch { return demoDocumentos; }
-  });
-  const [equipos, setEquipos] = useState<EquipoApp[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('jc_equipos') || '[]');
-      return mergeDemo(saved, demoEquipos);
-    } catch { return demoEquipos; }
-  });
+  const [documentos, setDocumentos] = useState<DocumentoApp[]>(demoDocumentos);
+  const [equipos, setEquipos] = useState<EquipoApp[]>(demoEquipos);
 
-  // Persistir en localStorage (sobreviven recargas de página)
-  useEffect(() => {
-    try {
-      localStorage.setItem('jc_proyectos', JSON.stringify(proyectos));
-    } catch (e) { console.log('⚠️ No se pudo persistir proyectos:', e); }
-  }, [proyectos]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('jc_documentos', JSON.stringify(documentos));
-    } catch (e) { console.log('⚠️ No se pudo persistir documentos (¿archivo muy grande?):', e); }
-  }, [documentos]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('jc_equipos', JSON.stringify(equipos));
-    } catch (e) { console.log('⚠️ No se pudo persistir equipos:', e); }
-  }, [equipos]);
 
   // Cargar datos del API al montar
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const [ventasData, clientesData, hornadasData, cobrosData, materiasData] = await Promise.allSettled([
+        const [ventasData, clientesData, hornadasData, cobrosData, materiasData, proyectosData, documentosData, equiposData] = await Promise.allSettled([
           ventasService.listar(),
           clientesService.listar(),
           hornadasService.listar(),
           cobrosService.listar(),
           materiasService.listar(),
+          proyectosService.listar(),
+          documentosService.listar(),
+          equiposService.listar(),
         ]);
 
         // Si la API responde exitosamente, actualizar los datos
@@ -363,6 +342,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (hornadasData.status === 'fulfilled') setHornadas(hornadasData.value);
         if (cobrosData.status === 'fulfilled') setCobros(cobrosData.value);
         if (materiasData.status === 'fulfilled') setRecepciones(materiasData.value);
+        if (proyectosData.status === 'fulfilled') {
+          setProyectos(mergeDemo(proyectosData.value, demoProyectos));
+          if (proyectosData.value.length === 0) demoProyectos.forEach((item) => proyectosService.crear(item).catch(() => {}));
+        }
+        if (documentosData.status === 'fulfilled') {
+          setDocumentos(mergeDemo(documentosData.value, demoDocumentos));
+          if (documentosData.value.length === 0) demoDocumentos.forEach((item) => documentosService.crear(item).catch(() => {}));
+        }
+        if (equiposData.status === 'fulfilled') {
+          setEquipos(mergeDemo(equiposData.value, demoEquipos));
+          if (equiposData.value.length === 0) demoEquipos.forEach((item) => equiposService.crear(item).catch(() => {}));
+        }
 
         console.log('✅ Datos cargados desde el API');
       } catch (error) {
@@ -491,40 +482,100 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addProyecto = (data: Proyecto) => {
-    setProyectos([...proyectos, { ...data, id: data.id || Date.now().toString() }]);
+  const addProyecto = async (data: Proyecto) => {
+    const nuevo = { ...data, id: data.id || Date.now().toString() };
+    setProyectos([...proyectos, nuevo]);
+    try {
+      await proyectosService.crear(nuevo);
+    } catch (error) {
+      console.log('Error al guardar proyecto en API:', error);
+    }
   };
 
-  const addDocumento = (data: DocumentoApp) => {
-    setDocumentos([...documentos, { ...data, id: data.id || Date.now().toString() }]);
+  const addDocumento = async (data: DocumentoApp) => {
+    const nuevo = { ...data, id: data.id || Date.now().toString() };
+    setDocumentos([...documentos, nuevo]);
+    try {
+      await documentosService.crear(nuevo);
+    } catch (error) {
+      console.log('Error al guardar documento en API:', error);
+    }
   };
 
-  const addEquipo = (data: EquipoApp) => {
-    setEquipos([...equipos, { ...data, id: data.id || Date.now().toString() }]);
+  const addEquipo = async (data: EquipoApp) => {
+    const nuevo = { ...data, id: data.id || Date.now().toString() };
+    setEquipos([...equipos, nuevo]);
+    try {
+      await equiposService.crear(nuevo);
+    } catch (error) {
+      console.log('Error al guardar equipo en API:', error);
+    }
   };
 
-  const updateProyecto = (id: string, data: Proyecto) => {
+  const updateProyecto = async (id: string, data: Proyecto) => {
+    const previous = proyectos.find((p) => p.id === id);
     setProyectos(proyectos.map((p) => (p.id === id ? { ...p, ...data, id } : p)));
+    try {
+      await proyectosService.actualizar(id, { ...data, id });
+    } catch (error) {
+      console.log('Error al actualizar proyecto en API:', error);
+      if (previous) setProyectos(proyectos.map((p) => (p.id === id ? previous : p)));
+    }
   };
 
-  const updateDocumento = (id: string, data: DocumentoApp) => {
+  const updateDocumento = async (id: string, data: DocumentoApp) => {
+    const previous = documentos.find((d) => d.id === id);
     setDocumentos(documentos.map((d) => (d.id === id ? { ...d, ...data, id } : d)));
+    try {
+      await documentosService.actualizar(id, { ...data, id });
+    } catch (error) {
+      console.log('Error al actualizar documento en API:', error);
+      if (previous) setDocumentos(documentos.map((d) => (d.id === id ? previous : d)));
+    }
   };
 
-  const updateEquipo = (id: string, data: EquipoApp) => {
+  const updateEquipo = async (id: string, data: EquipoApp) => {
+    const previous = equipos.find((e) => e.id === id);
     setEquipos(equipos.map((e) => (e.id === id ? { ...e, ...data, id } : e)));
+    try {
+      await equiposService.actualizar(id, { ...data, id });
+    } catch (error) {
+      console.log('Error al actualizar equipo en API:', error);
+      if (previous) setEquipos(equipos.map((e) => (e.id === id ? previous : e)));
+    }
   };
 
-  const deleteProyecto = (id: string) => {
+  const deleteProyecto = async (id: string) => {
+    const previous = proyectos;
     setProyectos(proyectos.filter((p) => p.id !== id));
+    try {
+      await proyectosService.eliminar(id);
+    } catch (error) {
+      console.log('Error al eliminar proyecto en API:', error);
+      setProyectos(previous);
+    }
   };
 
-  const deleteDocumento = (id: string) => {
+  const deleteDocumento = async (id: string) => {
+    const previous = documentos;
     setDocumentos(documentos.filter((d) => d.id !== id));
+    try {
+      await documentosService.eliminar(id);
+    } catch (error) {
+      console.log('Error al eliminar documento en API:', error);
+      setDocumentos(previous);
+    }
   };
 
-  const deleteEquipo = (id: string) => {
+  const deleteEquipo = async (id: string) => {
+    const previous = equipos;
     setEquipos(equipos.filter((e) => e.id !== id));
+    try {
+      await equiposService.eliminar(id);
+    } catch (error) {
+      console.log('Error al eliminar equipo en API:', error);
+      setEquipos(previous);
+    }
   };
 
   const deleteRecepcion = async (id: string) => {

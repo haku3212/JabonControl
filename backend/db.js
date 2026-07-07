@@ -3,247 +3,304 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const { Pool } = require('pg');
 
-// Usar volumen persistente de Railway si existe (los datos sobreviven deploys)
+const usePostgres = Boolean(process.env.DATABASE_URL);
 const volumePath = process.env.RAILWAY_VOLUME_MOUNT_PATH;
 const dbPath = process.env.DATABASE || (volumePath ? path.join(volumePath, 'database.db') : './database.db');
-let db = null;
 
-async function initDB() {
+let sqlDb = null;
+let pgPool = null;
+
+function toPgSql(sql) {
+  let index = 0;
+  return sql
+    .replace(/INSERT OR IGNORE INTO/gi, 'INSERT INTO')
+    .replace(/\?/g, () => `$${++index}`);
+}
+
+function normalizePgRow(row) {
+  const keyMap = {
+    ventames: 'ventaMes',
+    cobradomes: 'cobradoMes',
+    numerone: 'numeroNE',
+    preciounitario: 'precioUnitario',
+    tipopago: 'tipoPago',
+    saldopendiente: 'saldoPendiente',
+    montocobrado: 'montoCobrado',
+    metodopago: 'metodoPago',
+    notascorrespondientes: 'notasCorrespondientes',
+    horainicio: 'horaInicio',
+    naohvolumen: 'naohVolumen',
+    sebofund: 'seboFund',
+    aceitequem: 'aceiteQuem',
+    aceitecrudo: 'aceiteCrudo',
+    aceitealmendra: 'aceiteAlmendra',
+    jabonrecicl: 'jabonRecicl',
+    producciontotal: 'produccionTotal',
+    rendimiento: 'rendimiento',
+    preciototal: 'precioTotal',
+  };
+  return Object.entries(row).reduce((normalized, [key, value]) => {
+    normalized[keyMap[key] || key] = value;
+    return normalized;
+  }, {});
+}
+
+function resultToObjects(result) {
+  if (!result.length) return [];
+  const columns = result[0].columns;
+  return result[0].values.map((row) => {
+    const obj = {};
+    columns.forEach((col, idx) => {
+      obj[col] = row[idx];
+    });
+    return obj;
+  });
+}
+
+async function run(sql, params = []) {
+  if (usePostgres) {
+    const shouldIgnoreConflicts = /INSERT OR IGNORE INTO/i.test(sql);
+    const pgSql = toPgSql(sql);
+    const finalSql = shouldIgnoreConflicts && !/ON\s+CONFLICT/i.test(pgSql)
+      ? `${pgSql} ON CONFLICT DO NOTHING`
+      : pgSql;
+    await pgPool.query(finalSql, params);
+    return;
+  }
+  sqlDb.run(sql, params);
+}
+
+async function all(sql, params = []) {
+  if (usePostgres) {
+    const result = await pgPool.query(toPgSql(sql), params);
+    return result.rows.map(normalizePgRow);
+  }
+  return resultToObjects(sqlDb.exec(sql, params));
+}
+
+async function get(sql, params = []) {
+  const rows = await all(sql, params);
+  return rows[0] || null;
+}
+
+async function saveDB() {
+  if (usePostgres || !sqlDb) return;
+  const data = sqlDb.export();
+  fs.writeFileSync(dbPath, Buffer.from(data));
+}
+
+async function tryRun(sql, params = []) {
   try {
-    const SQL = await initSqlJs();
-
-    // Cargar DB existente o crear nueva
-    let data;
-    try {
-      data = fs.readFileSync(dbPath);
-    } catch (e) {
-      data = null;
-    }
-
-    if (data) {
-      db = new SQL.Database(data);
-    } else {
-      db = new SQL.Database();
-    }
-
-    // Crear tablas
-    db.run(`
-      CREATE TABLE IF NOT EXISTS usuarios (
-        id TEXT PRIMARY KEY,
-        nombre TEXT NOT NULL,
-        usuario TEXT UNIQUE NOT NULL,
-        email TEXT,
-        password TEXT NOT NULL,
-        rol TEXT NOT NULL DEFAULT 'operario',
-        estado TEXT DEFAULT 'activo',
-        ultimo_acceso DATETIME,
-        password_actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
-        creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS audit_logs (
-        id TEXT PRIMARY KEY,
-        usuario_id TEXT,
-        usuario TEXT,
-        rol TEXT,
-        accion TEXT NOT NULL,
-        tabla TEXT NOT NULL,
-        registro_id TEXT,
-        detalle TEXT,
-        valores_anteriores TEXT,
-        valores_nuevos TEXT,
-        hash_anterior TEXT,
-        hash_evento TEXT,
-        creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    try {
-      db.run('ALTER TABLE usuarios ADD COLUMN password_actualizado_en DATETIME');
-      db.run('UPDATE usuarios SET password_actualizado_en = COALESCE(password_actualizado_en, creado_en, CURRENT_TIMESTAMP)');
-    } catch (e) {
-      // La columna ya existe.
-    }
-
-    try {
-      db.run('ALTER TABLE audit_logs ADD COLUMN hash_anterior TEXT');
-    } catch (e) {
-      // La columna ya existe.
-    }
-
-    try {
-      db.run('ALTER TABLE audit_logs ADD COLUMN hash_evento TEXT');
-    } catch (e) {
-      // La columna ya existe.
-    }
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS clientes (
-        id TEXT PRIMARY KEY,
-        nombre TEXT NOT NULL UNIQUE,
-        tipo TEXT NOT NULL,
-        telefono TEXT,
-        email TEXT,
-        ciudad TEXT,
-        direccion TEXT,
-        ventaMes REAL DEFAULT 0,
-        cobradoMes REAL DEFAULT 0,
-        creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    try {
-      db.run('ALTER TABLE clientes ADD COLUMN email TEXT');
-    } catch (e) {
-      // La columna ya existe en bases creadas despues de esta version.
-    }
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS ventas (
-        id TEXT PRIMARY KEY,
-        numeroNE TEXT UNIQUE NOT NULL,
-        fecha TEXT NOT NULL,
-        cliente TEXT NOT NULL,
-        formato TEXT NOT NULL,
-        cantidad REAL NOT NULL,
-        precioUnitario REAL NOT NULL,
-        total REAL NOT NULL,
-        tipoPago TEXT NOT NULL,
-        estado TEXT DEFAULT 'pendiente',
-        creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(cliente) REFERENCES clientes(nombre)
-      )
-    `);
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS cobros (
-        id TEXT PRIMARY KEY,
-        fecha TEXT NOT NULL,
-        cliente TEXT NOT NULL,
-        montoCobrado REAL NOT NULL,
-        metodoPago TEXT NOT NULL,
-        notasCorrespondientes TEXT,
-        creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(cliente) REFERENCES clientes(nombre)
-      )
-    `);
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS movimientos_financieros (
-        id TEXT PRIMARY KEY,
-        fecha TEXT NOT NULL,
-        tipo TEXT NOT NULL CHECK(tipo IN ('ingreso', 'egreso')),
-        categoria TEXT NOT NULL,
-        concepto TEXT NOT NULL,
-        tercero TEXT,
-        metodoPago TEXT,
-        referencia TEXT,
-        monto REAL NOT NULL,
-        origen TEXT DEFAULT 'manual',
-        notas TEXT,
-        creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS hornadas (
-        id TEXT PRIMARY KEY,
-        numero TEXT UNIQUE NOT NULL,
-        fecha TEXT NOT NULL,
-        horaInicio TEXT NOT NULL,
-        operario TEXT NOT NULL,
-        naohVolumen REAL DEFAULT 0,
-        seboFund REAL DEFAULT 0,
-        aceiteQuem REAL DEFAULT 0,
-        aceiteCrudo REAL DEFAULT 0,
-        aceiteAlmendra REAL DEFAULT 0,
-        agua REAL DEFAULT 0,
-        jabonRecicl REAL DEFAULT 0,
-        produccionTotal REAL NOT NULL,
-        rendimiento REAL DEFAULT 0,
-        observaciones TEXT,
-        creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS materias_primas (
-        id TEXT PRIMARY KEY,
-        fecha TEXT NOT NULL,
-        proveedor TEXT NOT NULL,
-        producto TEXT NOT NULL,
-        cantidad REAL NOT NULL,
-        unidad TEXT NOT NULL,
-        precioUnitario REAL NOT NULL,
-        precioTotal REAL NOT NULL,
-        estado TEXT DEFAULT 'recibido',
-        creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    db.run(`
-      CREATE TABLE IF NOT EXISTS recepciones (
-        id TEXT PRIMARY KEY,
-        fecha TEXT NOT NULL,
-        proveedor TEXT NOT NULL,
-        producto TEXT NOT NULL,
-        cantidad REAL NOT NULL,
-        unidad TEXT NOT NULL,
-        precioUnitario REAL NOT NULL,
-        precioTotal REAL NOT NULL,
-        estado TEXT DEFAULT 'recibido',
-        creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Migración: agregar saldoPendiente a ventas existentes
-    try {
-      db.run('ALTER TABLE ventas ADD COLUMN saldoPendiente REAL');
-      // Inicializar: ventas a crédito deben su total, las canceladas no deben nada
-      db.run("UPDATE ventas SET saldoPendiente = CASE WHEN tipoPago = 'credito' THEN total ELSE 0 END");
-      db.run("UPDATE ventas SET estado = CASE WHEN tipoPago = 'credito' THEN 'pendiente' ELSE 'pagado' END");
-      console.log('✅ Migración saldoPendiente aplicada');
-    } catch (e) {
-      // La columna ya existe, no hacer nada
-    }
-
-    // Verificar si admin existe
-    const result = db.exec("SELECT * FROM usuarios WHERE usuario = 'admin'");
-    if (result.length === 0 || result[0].values.length === 0) {
-      if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
-        throw new Error('ADMIN_PASSWORD es obligatorio para crear admin en produccion');
-      }
-      const initialPassword = process.env.ADMIN_PASSWORD || 'admin123';
-      const hashedPass = bcrypt.hashSync(initialPassword, 10);
-      db.run(
-        "INSERT INTO usuarios (id, nombre, usuario, password, rol, password_actualizado_en) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)",
-        [crypto.randomUUID(), 'Administrador', 'admin', hashedPass, 'admin']
-      );
-      console.log('✅ Usuario admin creado');
-    }
-
-    if (process.env.ENABLE_DEMO_DATA === 'true' || process.env.NODE_ENV !== 'production') {
-      seedDemoData();
-    }
-
-    backfillAuditHashes();
-
-    // Guardar DB
-    saveDB();
-    console.log('✅ Base de datos SQL.js inicializada');
-  } catch (error) {
-    console.error('❌ Error inicializando base de datos:', error);
+    await run(sql, params);
+  } catch {
+    // Migracion ya aplicada o columna existente.
   }
 }
 
-function seedDemoData() {
-  const runMany = (sql, rows) => rows.forEach((row) => db.run(sql, row));
-  const demoPass = bcrypt.hashSync('demo123', 10);
+function timestampType() {
+  return usePostgres ? 'TIMESTAMPTZ' : 'DATETIME';
+}
 
-  runMany(
+async function initStorage() {
+  if (usePostgres) {
+    pgPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false },
+    });
+    await pgPool.query('SELECT 1');
+    return;
+  }
+
+  const SQL = await initSqlJs();
+  let data = null;
+  try {
+    data = fs.readFileSync(dbPath);
+  } catch {
+    data = null;
+  }
+  sqlDb = data ? new SQL.Database(data) : new SQL.Database();
+}
+
+async function createTables() {
+  const ts = timestampType();
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id TEXT PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      usuario TEXT UNIQUE NOT NULL,
+      email TEXT,
+      password TEXT NOT NULL,
+      rol TEXT NOT NULL DEFAULT 'operario',
+      estado TEXT DEFAULT 'activo',
+      ultimo_acceso ${ts},
+      password_actualizado_en ${ts} DEFAULT CURRENT_TIMESTAMP,
+      creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id TEXT PRIMARY KEY,
+      usuario_id TEXT,
+      usuario TEXT,
+      rol TEXT,
+      accion TEXT NOT NULL,
+      tabla TEXT NOT NULL,
+      registro_id TEXT,
+      detalle TEXT,
+      valores_anteriores TEXT,
+      valores_nuevos TEXT,
+      hash_anterior TEXT,
+      hash_evento TEXT,
+      creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await tryRun(`ALTER TABLE usuarios ADD COLUMN password_actualizado_en ${ts}`);
+  await tryRun('UPDATE usuarios SET password_actualizado_en = COALESCE(password_actualizado_en, creado_en, CURRENT_TIMESTAMP)');
+  await tryRun('ALTER TABLE audit_logs ADD COLUMN hash_anterior TEXT');
+  await tryRun('ALTER TABLE audit_logs ADD COLUMN hash_evento TEXT');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS clientes (
+      id TEXT PRIMARY KEY,
+      nombre TEXT NOT NULL UNIQUE,
+      tipo TEXT NOT NULL,
+      telefono TEXT,
+      email TEXT,
+      ciudad TEXT,
+      direccion TEXT,
+      ventaMes REAL DEFAULT 0,
+      cobradoMes REAL DEFAULT 0,
+      creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await tryRun('ALTER TABLE clientes ADD COLUMN email TEXT');
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS ventas (
+      id TEXT PRIMARY KEY,
+      numeroNE TEXT UNIQUE NOT NULL,
+      fecha TEXT NOT NULL,
+      cliente TEXT NOT NULL,
+      formato TEXT NOT NULL,
+      cantidad REAL NOT NULL,
+      precioUnitario REAL NOT NULL,
+      total REAL NOT NULL,
+      tipoPago TEXT NOT NULL,
+      estado TEXT DEFAULT 'pendiente',
+      saldoPendiente REAL,
+      creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS cobros (
+      id TEXT PRIMARY KEY,
+      fecha TEXT NOT NULL,
+      cliente TEXT NOT NULL,
+      montoCobrado REAL NOT NULL,
+      metodoPago TEXT NOT NULL,
+      notasCorrespondientes TEXT,
+      creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS movimientos_financieros (
+      id TEXT PRIMARY KEY,
+      fecha TEXT NOT NULL,
+      tipo TEXT NOT NULL CHECK(tipo IN ('ingreso', 'egreso')),
+      categoria TEXT NOT NULL,
+      concepto TEXT NOT NULL,
+      tercero TEXT,
+      metodoPago TEXT,
+      referencia TEXT,
+      monto REAL NOT NULL,
+      origen TEXT DEFAULT 'manual',
+      notas TEXT,
+      creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS app_records (
+      modulo TEXT NOT NULL,
+      id TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      creado_en ${ts} DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en ${ts} DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (modulo, id)
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS hornadas (
+      id TEXT PRIMARY KEY,
+      numero TEXT UNIQUE NOT NULL,
+      fecha TEXT NOT NULL,
+      horaInicio TEXT NOT NULL,
+      operario TEXT NOT NULL,
+      naohVolumen REAL DEFAULT 0,
+      seboFund REAL DEFAULT 0,
+      aceiteQuem REAL DEFAULT 0,
+      aceiteCrudo REAL DEFAULT 0,
+      aceiteAlmendra REAL DEFAULT 0,
+      agua REAL DEFAULT 0,
+      jabonRecicl REAL DEFAULT 0,
+      produccionTotal REAL NOT NULL,
+      rendimiento REAL DEFAULT 0,
+      observaciones TEXT,
+      creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS recepciones (
+      id TEXT PRIMARY KEY,
+      fecha TEXT NOT NULL,
+      proveedor TEXT NOT NULL,
+      producto TEXT NOT NULL,
+      cantidad REAL NOT NULL,
+      unidad TEXT NOT NULL,
+      precioUnitario REAL NOT NULL,
+      precioTotal REAL NOT NULL,
+      estado TEXT DEFAULT 'recibido',
+      creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await tryRun('ALTER TABLE ventas ADD COLUMN saldoPendiente REAL');
+  await run("UPDATE ventas SET saldoPendiente = CASE WHEN tipoPago = 'credito' THEN total ELSE 0 END WHERE saldoPendiente IS NULL");
+  await run("UPDATE ventas SET estado = CASE WHEN tipoPago = 'credito' AND COALESCE(saldoPendiente, 0) > 0 THEN 'pendiente' ELSE 'pagado' END WHERE estado IS NULL");
+}
+
+async function ensureAdmin() {
+  const admin = await get("SELECT * FROM usuarios WHERE usuario = 'admin'");
+  if (admin) return;
+
+  if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+    throw new Error('ADMIN_PASSWORD es obligatorio para crear admin en produccion');
+  }
+
+  const initialPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const hashedPass = bcrypt.hashSync(initialPassword, 10);
+  await run(
+    'INSERT INTO usuarios (id, nombre, usuario, password, rol, password_actualizado_en) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+    [crypto.randomUUID(), 'Administrador', 'admin', hashedPass, 'admin']
+  );
+}
+
+async function seedDemoData() {
+  const demoPass = bcrypt.hashSync('demo123', 10);
+  const runMany = async (sql, rows) => {
+    for (const row of rows) await run(sql, row);
+  };
+
+  await runMany(
     `INSERT OR IGNORE INTO usuarios (id, nombre, usuario, email, password, rol, estado)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -256,7 +313,7 @@ function seedDemoData() {
     ]
   );
 
-  runMany(
+  await runMany(
     `INSERT OR IGNORE INTO clientes (id, nombre, tipo, telefono, ciudad, direccion, ventaMes, cobradoMes)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
@@ -269,7 +326,7 @@ function seedDemoData() {
     ]
   );
 
-  runMany(
+  await runMany(
     `INSERT OR IGNORE INTO ventas
      (id, numeroNE, fecha, cliente, formato, cantidad, precioUnitario, total, tipoPago, estado, saldoPendiente)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -283,7 +340,7 @@ function seedDemoData() {
     ]
   );
 
-  runMany(
+  await runMany(
     `INSERT OR IGNORE INTO cobros (id, fecha, cliente, montoCobrado, metodoPago, notasCorrespondientes)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [
@@ -296,7 +353,7 @@ function seedDemoData() {
     ]
   );
 
-  runMany(
+  await runMany(
     `INSERT OR IGNORE INTO hornadas
      (id, numero, fecha, horaInicio, operario, naohVolumen, seboFund, aceiteQuem, aceiteCrudo, aceiteAlmendra, agua, jabonRecicl, produccionTotal, rendimiento, observaciones)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -310,7 +367,7 @@ function seedDemoData() {
     ]
   );
 
-  runMany(
+  await runMany(
     `INSERT OR IGNORE INTO recepciones
      (id, fecha, proveedor, producto, cantidad, unidad, precioUnitario, precioTotal, estado)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -325,7 +382,7 @@ function seedDemoData() {
     ]
   );
 
-  runMany(
+  await runMany(
     `INSERT OR IGNORE INTO movimientos_financieros
      (id, fecha, tipo, categoria, concepto, tercero, metodoPago, referencia, monto, origen, notas)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -340,109 +397,104 @@ function seedDemoData() {
   );
 }
 
-function saveDB() {
-  if (db) {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
-  }
-}
-
-function getDB() {
-  return db;
-}
-
 function safeJson(value) {
   if (value === undefined) return null;
   try {
     return JSON.stringify(value ?? null);
-  } catch (error) {
+  } catch {
     return JSON.stringify({ error: 'No se pudo serializar' });
   }
 }
 
-function backfillAuditHashes() {
-  if (!db) return;
-  const result = db.exec('SELECT rowid, * FROM audit_logs ORDER BY creado_en ASC, rowid ASC');
-  if (result.length === 0) return;
-  const columns = result[0].columns;
-  let previousHash = '';
-  result[0].values.forEach((row) => {
-    const log = {};
-    columns.forEach((col, idx) => {
-      log[col] = row[idx];
-    });
-    const hasHash = Boolean(log.hash_evento);
-    const hashAnterior = hasHash ? (log.hash_anterior || '') : previousHash;
-    const payload = [
-      log.id,
-      log.usuario_id || '',
-      log.usuario || 'sistema',
-      log.rol || '',
-      log.accion,
-      log.tabla,
-      log.registro_id || '',
-      log.detalle || '',
-      log.valores_anteriores || '',
-      log.valores_nuevos || '',
-      hashAnterior,
-    ].join('|');
-    const hashEvento = hasHash ? log.hash_evento : crypto.createHash('sha256').update(payload).digest('hex');
-    if (!hasHash) {
-      db.run('UPDATE audit_logs SET hash_anterior = ?, hash_evento = ? WHERE rowid = ?', [hashAnterior, hashEvento, log.rowid]);
-    }
-    previousHash = hashEvento || '';
-  });
+function auditPayload(log, hashAnterior) {
+  return [
+    log.id,
+    log.usuario_id || '',
+    log.usuario || 'sistema',
+    log.rol || '',
+    log.accion,
+    log.tabla,
+    log.registro_id || '',
+    log.detalle || '',
+    log.valores_anteriores || '',
+    log.valores_nuevos || '',
+    hashAnterior || '',
+  ].join('|');
 }
 
-function logAudit(req, accion, tabla, registroId, anteriores, nuevos, detalle) {
-  if (!db) return;
+async function backfillAuditHashes() {
+  const logs = await all('SELECT * FROM audit_logs ORDER BY creado_en ASC');
+  let previousHash = '';
+  for (const log of logs) {
+    const hasHash = Boolean(log.hash_evento);
+    const hashAnterior = hasHash ? (log.hash_anterior || '') : previousHash;
+    const hashEvento = hasHash ? log.hash_evento : crypto.createHash('sha256').update(auditPayload(log, hashAnterior)).digest('hex');
+    if (!hasHash) {
+      await run('UPDATE audit_logs SET hash_anterior = ?, hash_evento = ? WHERE id = ?', [hashAnterior, hashEvento, log.id]);
+    }
+    previousHash = hashEvento || '';
+  }
+}
+
+async function logAudit(req, accion, tabla, registroId, anteriores, nuevos, detalle) {
   const actor = req?.user || {};
   const id = crypto.randomUUID();
-  const previousHashResult = db.exec('SELECT hash_evento FROM audit_logs ORDER BY creado_en DESC, rowid DESC LIMIT 1');
-  const hashAnterior = previousHashResult.length ? previousHashResult[0].values[0][0] || '' : '';
+  const previous = await get('SELECT hash_evento FROM audit_logs ORDER BY creado_en DESC LIMIT 1');
+  const hashAnterior = previous?.hash_evento || '';
   const valoresAnteriores = safeJson(anteriores);
   const valoresNuevos = safeJson(nuevos);
-  const payload = [
+  const log = {
     id,
-    actor.id || '',
-    actor.usuario || actor.nombre || 'sistema',
-    actor.rol || '',
+    usuario_id: actor.id || null,
+    usuario: actor.usuario || actor.nombre || 'sistema',
+    rol: actor.rol || null,
     accion,
     tabla,
-    registroId || '',
-    detalle || '',
-    valoresAnteriores || '',
-    valoresNuevos || '',
-    hashAnterior,
-  ].join('|');
-  const hashEvento = crypto.createHash('sha256').update(payload).digest('hex');
-  db.run(
+    registro_id: registroId || null,
+    detalle: detalle || null,
+    valores_anteriores: valoresAnteriores,
+    valores_nuevos: valoresNuevos,
+  };
+  const hashEvento = crypto.createHash('sha256').update(auditPayload(log, hashAnterior)).digest('hex');
+
+  await run(
     `INSERT INTO audit_logs
       (id, usuario_id, usuario, rol, accion, tabla, registro_id, detalle, valores_anteriores, valores_nuevos, hash_anterior, hash_evento)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
-      actor.id || null,
-      actor.usuario || actor.nombre || 'sistema',
-      actor.rol || null,
+      log.usuario_id,
+      log.usuario,
+      log.rol,
       accion,
       tabla,
-      registroId || null,
-      detalle || null,
+      log.registro_id,
+      log.detalle,
       valoresAnteriores,
       valoresNuevos,
       hashAnterior,
       hashEvento,
     ]
   );
-  saveDB();
+  await saveDB();
+}
+
+async function initDB() {
+  await initStorage();
+  await createTables();
+  await ensureAdmin();
+  if (process.env.ENABLE_DEMO_DATA === 'true' || process.env.NODE_ENV !== 'production') {
+    await seedDemoData();
+  }
+  await backfillAuditHashes();
+  await saveDB();
+  console.log(usePostgres ? 'Base de datos PostgreSQL inicializada' : 'Base de datos SQL.js inicializada');
 }
 
 module.exports = initDB;
-module.exports.db = {
-  get: () => db,
-  save: saveDB
-};
+module.exports.all = all;
+module.exports.get = get;
+module.exports.run = run;
+module.exports.save = saveDB;
 module.exports.logAudit = logAudit;
-
+module.exports.isPostgres = () => usePostgres;

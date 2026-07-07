@@ -1,11 +1,15 @@
 {
   "name": "jaboncontrol",
   "version": "1.0.0",
-  "description": "ERP para Jabonería",
+  "description": "ERP para jaboneria",
   "main": "backend/server.js",
   "scripts": {
-    "start": "cd backend && npm install && node server.js",
-    "dev": "cd backend && npm install && node server.js"
+    "build": "cd backend && npm ci && cd ../jaboncontrol && npm ci && npm run build && cd .. && node scripts/copy-frontend.js",
+    "start": "node backend/server.js",
+    "dev": "cd backend && npm ci && node server.js"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "keywords": [],
   "author": "",

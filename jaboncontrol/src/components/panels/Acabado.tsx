@@ -2,17 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
 import { Modal } from '../common/Modal';
-
-interface RegistroAcabado {
-  id: string;
-  fecha: string;
-  area: 'compresora' | 'sellado';
-  operarios: string;
-  piezas: number;
-  bandejas: number;
-  kilos: number;
-  observaciones: string;
-}
+import { acabadoService } from '../../services/api';
+import type { RegistroAcabado } from '../../types';
 
 const emptyForm: RegistroAcabado = {
   id: '',
@@ -35,21 +26,23 @@ const demoAcabado: RegistroAcabado[] = [
 ];
 
 export function Acabado() {
-  const [registros, setRegistros] = useState<RegistroAcabado[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('jc_acabado') || '[]');
-      return saved.length ? saved : demoAcabado;
-    } catch {
-      return demoAcabado;
-    }
-  });
+  const [registros, setRegistros] = useState<RegistroAcabado[]>(demoAcabado);
   const [form, setForm] = useState<RegistroAcabado>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('jc_acabado', JSON.stringify(registros));
-  }, [registros]);
+    const load = async () => {
+      try {
+        const rows = await acabadoService.listar();
+        setRegistros(rows.length ? rows : demoAcabado);
+        if (rows.length === 0) demoAcabado.forEach((item) => acabadoService.crear(item).catch(() => {}));
+      } catch (error) {
+        console.log('Usando datos demo de acabado:', error);
+      }
+    };
+    load();
+  }, []);
 
   const resumen = useMemo(() => ({
     piezas: registros.reduce((sum, item) => sum + Number(item.piezas || 0), 0),
@@ -57,15 +50,29 @@ export function Acabado() {
     kilos: registros.reduce((sum, item) => sum + Number(item.kilos || 0), 0),
   }), [registros]);
 
-  const save = () => {
+  const save = async () => {
     if (!form.operarios.trim()) {
       alert('Indica los operarios del registro.');
       return;
     }
     if (editingId) {
-      setRegistros(registros.map((item) => (item.id === editingId ? { ...form, id: editingId } : item)));
+      const updated = { ...form, id: editingId };
+      const previous = registros;
+      setRegistros(registros.map((item) => (item.id === editingId ? updated : item)));
+      try {
+        await acabadoService.actualizar(editingId, updated);
+      } catch (error) {
+        console.log('No se pudo actualizar acabado:', error);
+        setRegistros(previous);
+      }
     } else {
-      setRegistros([{ ...form, id: Date.now().toString() }, ...registros]);
+      const nuevo = { ...form, id: Date.now().toString() };
+      setRegistros([nuevo, ...registros]);
+      try {
+        await acabadoService.crear(nuevo);
+      } catch (error) {
+        console.log('No se pudo guardar acabado:', error);
+      }
     }
     setForm(emptyForm);
     setEditingId(null);
@@ -78,9 +85,16 @@ export function Acabado() {
     setShowForm(true);
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     if (confirm('Eliminar este registro de acabado?')) {
+      const previous = registros;
       setRegistros(registros.filter((item) => item.id !== id));
+      try {
+        await acabadoService.eliminar(id);
+      } catch (error) {
+        console.log('No se pudo eliminar acabado:', error);
+        setRegistros(previous);
+      }
     }
   };
 

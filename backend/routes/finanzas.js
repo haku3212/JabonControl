@@ -4,29 +4,6 @@ const dbModule = require('../db');
 const { v4: uuid } = require('uuid');
 const { logAudit } = require('../db');
 
-function rowsToObjects(result) {
-  if (result.length === 0) return [];
-  const columns = result[0].columns;
-  return result[0].values.map((row) => {
-    const obj = {};
-    columns.forEach((col, idx) => {
-      obj[col] = row[idx];
-    });
-    return obj;
-  });
-}
-
-function rowToObject(result) {
-  if (result.length === 0 || result[0].values.length === 0) return null;
-  const row = result[0].values[0];
-  const columns = result[0].columns;
-  const obj = {};
-  columns.forEach((col, idx) => {
-    obj[col] = row[idx];
-  });
-  return obj;
-}
-
 function normalizeMovement(body) {
   const monto = Number(body.monto || body.importe || body.total || 0);
   return {
@@ -43,17 +20,16 @@ function normalizeMovement(body) {
   };
 }
 
-router.get('/movimientos', (req, res) => {
+router.get('/movimientos', async (req, res) => {
   try {
-    const db = dbModule.db.get();
-    const result = db.exec('SELECT * FROM movimientos_financieros ORDER BY fecha DESC, creado_en DESC');
-    res.json(rowsToObjects(result));
+    const rows = await dbModule.all('SELECT * FROM movimientos_financieros ORDER BY fecha DESC, creado_en DESC');
+    res.json(rows || []);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-router.post('/movimientos', (req, res) => {
+router.post('/movimientos', async (req, res) => {
   try {
     const data = normalizeMovement(req.body);
     if (!data.concepto || !data.monto) {
@@ -61,15 +37,14 @@ router.post('/movimientos', (req, res) => {
     }
 
     const id = uuid();
-    const db = dbModule.db.get();
-    db.run(
+    await dbModule.run(
       `INSERT INTO movimientos_financieros
        (id, fecha, tipo, categoria, concepto, tercero, metodoPago, referencia, monto, origen, notas)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, data.fecha, data.tipo, data.categoria, data.concepto, data.tercero, data.metodoPago, data.referencia, data.monto, data.origen, data.notas]
     );
-    dbModule.db.save();
-    logAudit(req, 'crear', 'movimientos_financieros', id, null, data, `Movimiento financiero ${data.tipo}: ${data.concepto}`);
+    await dbModule.save();
+    await logAudit(req, 'crear', 'movimientos_financieros', id, null, data, `Movimiento financiero ${data.tipo}: ${data.concepto}`);
 
     res.status(201).json({ id, message: 'Movimiento registrado' });
   } catch (error) {
@@ -77,44 +52,43 @@ router.post('/movimientos', (req, res) => {
   }
 });
 
-router.post('/importar', (req, res) => {
+router.post('/importar', async (req, res) => {
   try {
     const movimientos = Array.isArray(req.body.movimientos) ? req.body.movimientos : [];
     if (movimientos.length === 0) {
       return res.status(400).json({ error: 'No hay movimientos para importar' });
     }
 
-    const db = dbModule.db.get();
     const inserted = [];
     const skipped = [];
 
-    movimientos.forEach((item, index) => {
-      const data = normalizeMovement({ ...item, origen: item.origen || 'excel' });
+    for (const [index, item] of movimientos.entries()) {
+      const data = normalizeMovement({ ...item, origen: item.origen || 'csv' });
       if (!data.concepto || !data.monto) {
         skipped.push({ index, reason: 'Concepto o monto faltante', item });
-        return;
+        continue;
       }
 
       const existing = data.referencia
-        ? rowToObject(db.exec('SELECT id FROM movimientos_financieros WHERE referencia = ? AND monto = ? AND fecha = ?', [data.referencia, data.monto, data.fecha]))
+        ? await dbModule.get('SELECT id FROM movimientos_financieros WHERE referencia = ? AND monto = ? AND fecha = ?', [data.referencia, data.monto, data.fecha])
         : null;
       if (existing) {
         skipped.push({ index, reason: 'Duplicado por referencia, monto y fecha', item });
-        return;
+        continue;
       }
 
       const id = uuid();
-      db.run(
+      await dbModule.run(
         `INSERT INTO movimientos_financieros
          (id, fecha, tipo, categoria, concepto, tercero, metodoPago, referencia, monto, origen, notas)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, data.fecha, data.tipo, data.categoria, data.concepto, data.tercero, data.metodoPago, data.referencia, data.monto, data.origen, data.notas]
       );
       inserted.push({ id, ...data });
-    });
+    }
 
-    dbModule.db.save();
-    logAudit(req, 'crear', 'movimientos_financieros', null, null, { insertados: inserted.length, omitidos: skipped.length }, `Importacion financiera desde Excel: ${inserted.length} movimientos`);
+    await dbModule.save();
+    await logAudit(req, 'crear', 'movimientos_financieros', null, null, { insertados: inserted.length, omitidos: skipped.length }, `Importacion financiera desde CSV: ${inserted.length} movimientos`);
 
     res.status(201).json({ inserted: inserted.length, skipped, message: 'Importacion procesada' });
   } catch (error) {
@@ -122,15 +96,14 @@ router.post('/importar', (req, res) => {
   }
 });
 
-router.delete('/movimientos/:id', (req, res) => {
+router.delete('/movimientos/:id', async (req, res) => {
   try {
-    const db = dbModule.db.get();
-    const previous = rowToObject(db.exec('SELECT * FROM movimientos_financieros WHERE id = ?', [req.params.id]));
+    const previous = await dbModule.get('SELECT * FROM movimientos_financieros WHERE id = ?', [req.params.id]);
     if (!previous) return res.status(404).json({ error: 'Movimiento no encontrado' });
 
-    db.run('DELETE FROM movimientos_financieros WHERE id = ?', [req.params.id]);
-    dbModule.db.save();
-    logAudit(req, 'eliminar', 'movimientos_financieros', req.params.id, previous, null, `Movimiento financiero eliminado: ${previous.concepto}`);
+    await dbModule.run('DELETE FROM movimientos_financieros WHERE id = ?', [req.params.id]);
+    await dbModule.save();
+    await logAudit(req, 'eliminar', 'movimientos_financieros', req.params.id, previous, null, `Movimiento financiero eliminado: ${previous.concepto}`);
     res.json({ message: 'Movimiento eliminado' });
   } catch (error) {
     res.status(500).json({ error: error.message });
