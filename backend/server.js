@@ -27,6 +27,16 @@ const allowedOrigins = (process.env.CORS_ORIGIN || 'http://127.0.0.1:5173,http:/
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+function isLocalDevelopmentOrigin(origin) {
+  if (process.env.NODE_ENV === 'production') return false;
+  try {
+    const url = new URL(origin);
+    return ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 // Middleware
 // Helmet agrega headers HTTP defensivos siguiendo buenas practicas OWASP.
 app.use(helmet({
@@ -56,6 +66,9 @@ app.use(cors({
 
     // Acepta solo origenes configurados.
     if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    // En desarrollo acepta Vite aunque cambie de puerto.
+    if (isLocalDevelopmentOrigin(origin)) return callback(null, true);
 
     // Rechaza origenes externos no esperados.
     return callback(new Error('Origen no permitido por CORS'));
