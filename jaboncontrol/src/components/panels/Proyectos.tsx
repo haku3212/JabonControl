@@ -146,15 +146,23 @@ export function Proyectos({}: ProyectosProps) {
                               To-do list: {hechas}/{tareas.length}
                             </div>
                             {tareas.slice(0, 5).map((tarea) => (
-                              <label key={tarea.id} className="flex items-start gap-2 text-xs text-text-secondary cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={tarea.completada}
-                                  onChange={() => toggleTask(proyecto, tarea.id)}
-                                  className="mt-0.5 accent-yellow-500"
-                                />
+                              <button
+                                key={tarea.id}
+                                type="button"
+                                onClick={() => toggleTask(proyecto, tarea.id)}
+                                className="flex w-full items-center gap-2 rounded px-0.5 py-1 text-left text-xs text-text-secondary hover:bg-dark-surface3 focus:outline-none focus:ring-2 focus:ring-accent-yellow focus:ring-opacity-30"
+                              >
+                                <span
+                                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold ${
+                                    tarea.completada
+                                      ? 'border-accent-yellow bg-accent-yellow text-black'
+                                      : 'border-dark-border bg-dark-bg text-transparent'
+                                  }`}
+                                >
+                                  ✓
+                                </span>
                                 <span className={tarea.completada ? 'line-through text-text-tertiary' : ''}>{tarea.texto}</span>
-                              </label>
+                              </button>
                             ))}
                             {tareas.length > 5 && <div className="text-xs text-text-tertiary">+ {tareas.length - 5} tareas mas</div>}
                           </div>
