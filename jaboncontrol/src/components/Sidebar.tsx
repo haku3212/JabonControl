@@ -35,7 +35,7 @@ const baseSections: NavSection[] = [
   {
     label: 'Comercial',
     items: [
-      { id: 'ventas', icon: '🛒', label: 'Ventas', badge: 3 },
+      { id: 'ventas', icon: '🛒', label: 'Ventas' },
       { id: 'cobros', icon: '💰', label: 'Cobros' },
       { id: 'clientes', icon: '👥', label: 'Clientes' },
       { id: 'finanzas', icon: 'FIN', label: 'Finanzas' },
