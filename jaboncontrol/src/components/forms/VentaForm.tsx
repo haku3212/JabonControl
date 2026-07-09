@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useAppContext } from '../../context/AppContext';
 
 interface VentaFormProps {
   onSave: (data: any) => Promise<void>;
@@ -6,18 +7,25 @@ interface VentaFormProps {
 }
 
 export function VentaForm({ onSave, onCancel }: VentaFormProps) {
+  const { clientes } = useAppContext();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     numeroNE: `NE-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
     fecha: new Date().toISOString().split('T')[0],
-    cliente: 'Distribuidora Litoral',
+    cliente: '',
     formato: 'Cajas',
     cantidad: 0,
     precioUnitario: 0,
-    tipoPago: 'cancelado' as 'cancelado' | 'credito',
+    tipoPago: 'contado' as 'contado' | 'credito',
   });
 
   const total = form.cantidad * form.precioUnitario;
+
+  useEffect(() => {
+    if (!form.cliente && clientes.length > 0) {
+      setForm((current) => ({ ...current, cliente: clientes[0].nombre }));
+    }
+  }, [clientes, form.cliente]);
 
   const handleSubmit = async () => {
     if (!form.cliente || form.cantidad <= 0 || form.precioUnitario <= 0) {
@@ -30,7 +38,7 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
       await onSave({
         ...form,
         id: Date.now().toString(),
-        total: total,
+        total,
         precioTotal: total,
       });
     } catch (error) {
@@ -45,7 +53,7 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-4">
         <div>
-          <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">N° Nota de Entrega</label>
+          <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Nro. Nota de Entrega</label>
           <input
             type="text"
             value={form.numeroNE}
@@ -64,17 +72,21 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
         </div>
         <div>
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Cliente</label>
-          <select
+          <input
+            list="clientes-ventas"
             value={form.cliente}
             onChange={(e) => setForm({ ...form, cliente: e.target.value })}
+            placeholder="Buscar o elegir cliente"
             className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
-          >
-            <option>Distribuidora Litoral</option>
-            <option>Supermercado El Sol</option>
-            <option>Ferretería Central</option>
-            <option>Mercado Mutualista</option>
-            <option>Dist. Santa Cruz</option>
-          </select>
+          />
+          <datalist id="clientes-ventas">
+            {clientes.map((cliente) => (
+              <option key={cliente.id} value={cliente.nombre} />
+            ))}
+          </datalist>
+          {clientes.length === 0 && (
+            <p className="text-xs text-status-warning mt-1">Primero registre un cliente.</p>
+          )}
         </div>
         <div>
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Formato</label>
@@ -84,7 +96,7 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
             className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
           >
             <option>Cajas</option>
-            <option>Nódulos</option>
+            <option>Nodulos</option>
             <option>Barras</option>
           </select>
         </div>
@@ -112,11 +124,11 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Tipo de Pago</label>
           <select
             value={form.tipoPago}
-            onChange={(e) => setForm({ ...form, tipoPago: e.target.value as 'cancelado' | 'credito' })}
+            onChange={(e) => setForm({ ...form, tipoPago: e.target.value as 'contado' | 'credito' })}
             className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
           >
-            <option value="cancelado">Cancelado</option>
-            <option value="credito">Crédito</option>
+            <option value="contado">Contado</option>
+            <option value="credito">Credito</option>
           </select>
         </div>
         <div>
@@ -148,7 +160,7 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
           disabled={loading}
           className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90 disabled:opacity-50"
         >
-          {loading ? '⏳ Guardando...' : '💾 Guardar Venta'}
+          {loading ? 'Guardando...' : 'Guardar Venta'}
         </button>
       </div>
     </div>
