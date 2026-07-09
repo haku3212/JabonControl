@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { unitsForSale } from '../../utils/inventory';
 
@@ -24,12 +24,6 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
   const unidadesSolicitadas = unitsForSale(form.formato, form.cantidad);
   const stockDisponible = kpis.inventarioDisponible;
   const excedeStock = unidadesSolicitadas > stockDisponible;
-
-  useEffect(() => {
-    if (!form.cliente && clientes.length > 0) {
-      setForm((current) => ({ ...current, cliente: clientes[0].nombre }));
-    }
-  }, [clientes, form.cliente]);
 
   const handleSubmit = async () => {
     if (!form.cliente || form.cantidad <= 0 || form.precioUnitario <= 0) {
@@ -80,13 +74,26 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
         </div>
         <div>
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Cliente</label>
-          <input
-            list="clientes-ventas"
-            value={form.cliente}
-            onChange={(e) => setForm({ ...form, cliente: e.target.value })}
-            placeholder="Buscar o elegir cliente"
-            className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
-          />
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <input
+              list="clientes-ventas"
+              value={form.cliente}
+              onChange={(e) => setForm({ ...form, cliente: e.target.value })}
+              placeholder="Escribir cliente"
+              className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+            />
+            <select
+              value=""
+              onChange={(e) => e.target.value && setForm({ ...form, cliente: e.target.value })}
+              className="w-36 bg-dark-surface2 border border-dark-border rounded px-2 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+              title="Elegir cliente registrado"
+            >
+              <option value="">Elegir</option>
+              {clientes.map((cliente) => (
+                <option key={cliente.id} value={cliente.nombre}>{cliente.nombre}</option>
+              ))}
+            </select>
+          </div>
           <datalist id="clientes-ventas">
             {clientes.map((cliente) => (
               <option key={cliente.id} value={cliente.nombre} />
