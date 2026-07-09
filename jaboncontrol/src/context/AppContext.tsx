@@ -22,7 +22,7 @@ import {
   equiposService,
   acabadoService,
 } from '../services/api';
-import { calculateFinishedInventory } from '../utils/inventory';
+import { calculateFinishedInventory, unitsForSale } from '../utils/inventory';
 
 interface AppContextType {
   // Data
@@ -141,6 +141,7 @@ const initialVentas: Venta[] = [
     cliente: 'Distribuidora Litoral',
     formato: 'Cajas',
     cantidad: 120,
+    unidadesPorCaja: 50,
     precioUnitario: 20,
     total: 2400,
     precioTotal: 2400,
@@ -153,6 +154,7 @@ const initialVentas: Venta[] = [
     cliente: 'Supermercado El Sol',
     formato: 'Nódulos',
     cantidad: 80,
+    unidadesPorCaja: 1,
     precioUnitario: 20,
     total: 1600,
     precioTotal: 1600,
@@ -418,7 +420,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addVenta = async (data: Venta) => {
     const inventario = calculateFinishedInventory(acabado, ventas);
-    const unidadesSolicitadas = data.formato.toLowerCase().includes('caja') ? data.cantidad * 12 : data.cantidad;
+    const unidadesSolicitadas = unitsForSale(data.formato, data.cantidad, data.unidadesPorCaja);
     if (unidadesSolicitadas > inventario.disponibles) {
       throw new Error(`Stock insuficiente. Disponible: ${inventario.disponibles} unidades.`);
     }

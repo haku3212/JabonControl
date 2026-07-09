@@ -84,7 +84,7 @@ export function Ventas({ onNewClick }: VentasProps = {}) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-dark-border">
-                {['N NE', 'Fecha', 'Cliente', 'Formato', 'Cantidad', 'P. Unitario', 'Total', 'Tipo pago', ''].map((h) => (
+                {['N NE', 'Fecha', 'Cliente', 'Formato', 'Cantidad', 'Pastas/caja', 'P. Unitario', 'Total', 'Tipo pago', ''].map((h) => (
                   <th key={h} className="text-left px-3 py-2 text-xs font-mono text-text-tertiary uppercase">{h}</th>
                 ))}
               </tr>
@@ -97,6 +97,7 @@ export function Ventas({ onNewClick }: VentasProps = {}) {
                   <td className="px-3 py-2 text-text-secondary">{venta.cliente}</td>
                   <td className="px-3 py-2 text-text-secondary">{venta.formato}</td>
                   <td className="px-3 py-2 font-mono text-text-secondary">{venta.cantidad}</td>
+                  <td className="px-3 py-2 font-mono text-text-secondary">{venta.formato?.toLowerCase().includes('caja') ? (venta.unidadesPorCaja || 50) : '-'}</td>
                   <td className="px-3 py-2 font-mono text-text-secondary">{money(venta.precioUnitario)}</td>
                   <td className="px-3 py-2 font-mono text-accent-yellow">{money(venta.total || venta.precioTotal || 0)}</td>
                   <td className="px-3 py-2"><Badge label={venta.tipoPago === 'contado' ? 'Pagado' : 'Credito'} type={venta.tipoPago === 'contado' ? 'success' : 'warning'} /></td>

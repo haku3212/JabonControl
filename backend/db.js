@@ -25,6 +25,7 @@ function normalizePgRow(row) {
     cobradomes: 'cobradoMes',
     numerone: 'numeroNE',
     preciounitario: 'precioUnitario',
+    unidadesporcaja: 'unidadesPorCaja',
     tipopago: 'tipoPago',
     saldopendiente: 'saldoPendiente',
     montocobrado: 'montoCobrado',
@@ -188,6 +189,7 @@ async function createTables() {
       cliente TEXT NOT NULL,
       formato TEXT NOT NULL,
       cantidad REAL NOT NULL,
+      unidadesPorCaja REAL DEFAULT 50,
       precioUnitario REAL NOT NULL,
       total REAL NOT NULL,
       tipoPago TEXT NOT NULL,
@@ -274,6 +276,12 @@ async function createTables() {
   `);
 
   await tryRun('ALTER TABLE ventas ADD COLUMN saldoPendiente REAL');
+  await tryRun('ALTER TABLE ventas ADD COLUMN unidadesPorCaja REAL DEFAULT 50');
+  await run("UPDATE ventas SET unidadesPorCaja = 50 WHERE unidadesPorCaja IS NULL AND LOWER(formato) LIKE '%caja%'");
+  await run("UPDATE ventas SET unidadesPorCaja = 1 WHERE unidadesPorCaja IS NULL");
+  await run("UPDATE ventas SET cantidad = 18, unidadesPorCaja = 50, total = 396 WHERE id = 'demo-ven-1'");
+  await run("UPDATE ventas SET cantidad = 6, unidadesPorCaja = 50, total = 138, saldoPendiente = CASE WHEN saldoPendiente > 138 THEN 138 ELSE saldoPendiente END WHERE id = 'demo-ven-4'");
+  await run("UPDATE ventas SET cantidad = 30, unidadesPorCaja = 50, total = 630 WHERE id = 'demo-ven-6'");
   await run("UPDATE ventas SET saldoPendiente = CASE WHEN tipoPago = 'credito' THEN total ELSE 0 END WHERE saldoPendiente IS NULL");
   await run("UPDATE ventas SET estado = CASE WHEN tipoPago = 'credito' AND COALESCE(saldoPendiente, 0) > 0 THEN 'pendiente' ELSE 'pagado' END WHERE estado IS NULL");
 }
@@ -328,15 +336,15 @@ async function seedDemoData() {
 
   await runMany(
     `INSERT OR IGNORE INTO ventas
-     (id, numeroNE, fecha, cliente, formato, cantidad, precioUnitario, total, tipoPago, estado, saldoPendiente)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (id, numeroNE, fecha, cliente, formato, cantidad, unidadesPorCaja, precioUnitario, total, tipoPago, estado, saldoPendiente)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      ['demo-ven-1', 'NE-1001', '2026-07-01', 'Distribuidora Litoral', 'Cajas', 180, 22, 3960, 'contado', 'pagado', 0],
-      ['demo-ven-2', 'NE-1002', '2026-07-01', 'Supermercado El Sol', 'Barras', 120, 18, 2160, 'credito', 'parcial', 760],
-      ['demo-ven-3', 'NE-1003', '2026-07-02', 'Comercial Norte', 'Nodulos', 95, 16, 1520, 'contado', 'pagado', 0],
-      ['demo-ven-4', 'NE-1004', '2026-07-02', 'Hotel Amazonas', 'Cajas', 60, 23, 1380, 'credito', 'pendiente', 1380],
-      ['demo-ven-5', 'NE-1005', '2026-07-03', 'Mercado Popular Beni', 'Barras', 210, 17, 3570, 'credito', 'pendiente', 3570],
-      ['demo-ven-6', 'NE-1006', '2026-07-03', 'Limpieza Industrial SRL', 'Cajas', 300, 21, 6300, 'contado', 'pagado', 0],
+      ['demo-ven-1', 'NE-1001', '2026-07-01', 'Distribuidora Litoral', 'Cajas', 18, 50, 22, 396, 'contado', 'pagado', 0],
+      ['demo-ven-2', 'NE-1002', '2026-07-01', 'Supermercado El Sol', 'Barras', 120, 1, 18, 2160, 'credito', 'parcial', 760],
+      ['demo-ven-3', 'NE-1003', '2026-07-02', 'Comercial Norte', 'Nodulos', 95, 1, 16, 1520, 'contado', 'pagado', 0],
+      ['demo-ven-4', 'NE-1004', '2026-07-02', 'Hotel Amazonas', 'Cajas', 6, 50, 23, 138, 'credito', 'pendiente', 138],
+      ['demo-ven-5', 'NE-1005', '2026-07-03', 'Mercado Popular Beni', 'Barras', 210, 1, 17, 3570, 'credito', 'pendiente', 3570],
+      ['demo-ven-6', 'NE-1006', '2026-07-03', 'Limpieza Industrial SRL', 'Cajas', 30, 50, 21, 630, 'contado', 'pagado', 0],
     ]
   );
 

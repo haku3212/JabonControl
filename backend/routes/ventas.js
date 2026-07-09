@@ -36,13 +36,18 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', requireRoles('admin', 'supervisor'), async (req, res) => {
   try {
-    const { numeroNE, fecha, cliente, formato, cantidad, precioUnitario, total, tipoPago } = req.body;
+    const { numeroNE, fecha, cliente, formato, cantidad, unidadesPorCaja, precioUnitario, total, tipoPago } = req.body;
     if (!numeroNE || !cliente || !cantidad || !precioUnitario) {
       return res.status(400).json({ error: 'Campos requeridos' });
     }
 
     const inventario = await getFinishedInventory(dbModule);
-    const unidadesSolicitadas = unitsForSale(formato, cantidad);
+    const unidadesPorCajaFinal = String(formato || '').toLowerCase().includes('caja') ? Number(unidadesPorCaja || 50) : 1;
+    if (unidadesPorCajaFinal <= 0) {
+      return res.status(400).json({ error: 'Pastas por caja debe ser mayor a cero.' });
+    }
+
+    const unidadesSolicitadas = unitsForSale(formato, cantidad, unidadesPorCajaFinal);
     if (unidadesSolicitadas > inventario.disponibles) {
       return res.status(400).json({
         error: `Stock insuficiente. Disponible: ${inventario.disponibles} unidades; solicitado: ${unidadesSolicitadas} unidades.`,
@@ -54,9 +59,9 @@ router.post('/', requireRoles('admin', 'supervisor'), async (req, res) => {
     const saldoPendiente = tipoPago === 'credito' ? Number(total || 0) : 0;
     const estado = tipoPago === 'credito' ? 'pendiente' : 'pagado';
     await dbModule.run(
-      `INSERT INTO ventas (id, numeroNE, fecha, cliente, formato, cantidad, precioUnitario, total, tipoPago, estado, saldoPendiente)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, numeroNE, fecha || new Date().toISOString().split('T')[0], cliente, formato, cantidad, precioUnitario, total, tipoPago, estado, saldoPendiente]
+      `INSERT INTO ventas (id, numeroNE, fecha, cliente, formato, cantidad, unidadesPorCaja, precioUnitario, total, tipoPago, estado, saldoPendiente)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, numeroNE, fecha || new Date().toISOString().split('T')[0], cliente, formato, cantidad, unidadesPorCajaFinal, precioUnitario, total, tipoPago, estado, saldoPendiente]
     );
     await dbModule.save();
     await logAudit(req, 'crear', 'ventas', id, null, req.body, `Venta ${numeroNE} para ${cliente}`);

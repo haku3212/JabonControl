@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
-import { unitsForSale } from '../../utils/inventory';
+import { UNIDADES_POR_CAJA, unitsForSale } from '../../utils/inventory';
 
 interface VentaFormProps {
   onSave: (data: any) => Promise<void>;
@@ -16,18 +16,24 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
     cliente: '',
     formato: 'Cajas',
     cantidad: 0,
+    unidadesPorCaja: UNIDADES_POR_CAJA,
     precioUnitario: 0,
     tipoPago: 'contado' as 'contado' | 'credito',
   });
 
   const total = form.cantidad * form.precioUnitario;
-  const unidadesSolicitadas = unitsForSale(form.formato, form.cantidad);
+  const esCaja = form.formato.toLowerCase().includes('caja');
+  const unidadesSolicitadas = unitsForSale(form.formato, form.cantidad, form.unidadesPorCaja);
   const stockDisponible = kpis.inventarioDisponible;
   const excedeStock = unidadesSolicitadas > stockDisponible;
 
   const handleSubmit = async () => {
     if (!form.cliente || form.cantidad <= 0 || form.precioUnitario <= 0) {
       alert('Por favor complete todos los campos correctamente');
+      return;
+    }
+    if (esCaja && form.unidadesPorCaja <= 0) {
+      alert('Indique cuantas pastas trae cada caja.');
       return;
     }
     if (excedeStock) {
@@ -107,7 +113,7 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Formato</label>
           <select
             value={form.formato}
-            onChange={(e) => setForm({ ...form, formato: e.target.value })}
+            onChange={(e) => setForm({ ...form, formato: e.target.value, unidadesPorCaja: e.target.value.toLowerCase().includes('caja') ? form.unidadesPorCaja || UNIDADES_POR_CAJA : 1 })}
             className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
           >
             <option>Cajas</option>
@@ -125,6 +131,18 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
             className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
           />
         </div>
+        {esCaja && (
+          <div>
+            <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Pastas por caja</label>
+            <input
+              type="number"
+              value={form.unidadesPorCaja || ''}
+              onChange={(e) => setForm({ ...form, unidadesPorCaja: Number(e.target.value) })}
+              placeholder="50"
+              className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+            />
+          </div>
+        )}
         <div>
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Precio Unitario (Bs)</label>
           <input

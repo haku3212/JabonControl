@@ -37,6 +37,7 @@ export interface Venta {
   cliente: string;
   formato: string;
   cantidad: number;
+  unidadesPorCaja?: number;
   precioUnitario: number;
   precioTotal: number;
   tipoPago: 'cancelado' | 'credito';
