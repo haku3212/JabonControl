@@ -32,8 +32,6 @@ export function Ventas({ onNewClick }: VentasProps = {}) {
   const totalPeriodo = filteredVentas.reduce((sum, v) => sum + (v.total || v.precioTotal || 0), 0);
   const contado = filteredVentas.filter((v) => v.tipoPago === 'contado');
   const credito = filteredVentas.filter((v) => v.tipoPago === 'credito');
-  const mejorCliente = [...filteredVentas].sort((a, b) => (b.total || b.precioTotal || 0) - (a.total || a.precioTotal || 0))[0];
-
   // Borrado seguro: exige confirmacion antes de tocar datos.
   const safeDelete = (venta: any) => {
     // El mensaje incluye numero y cliente para evitar borrar la nota equivocada.
@@ -62,7 +60,7 @@ export function Ventas({ onNewClick }: VentasProps = {}) {
         <KPICard label="Periodo filtrado" value={money(totalPeriodo)} unit={`${filteredVentas.length} notas`} color="yellow" />
         <KPICard label="Credito pendiente" value={money(kpis.cobrosPendientes)} unit={`${credito.length} notas`} color="orange" />
         <KPICard label="Cancelado" value={money(contado.reduce((s, v) => s + (v.total || v.precioTotal || 0), 0))} unit={`${contado.length} notas`} color="blue" />
-        <KPICard label="Mayor venta" value={mejorCliente ? money(mejorCliente.total || mejorCliente.precioTotal || 0) : 'Bs 0'} unit={mejorCliente?.cliente || 'Sin datos'} color="green" />
+        <KPICard label="Inventario disponible" value={kpis.inventarioDisponible.toLocaleString('es-BO')} unit="unidades terminadas" color="green" />
       </div>
 
       <Card title="Notas de entrega" badge={{ label: `${filteredVentas.length} registros`, type: 'info' }}>

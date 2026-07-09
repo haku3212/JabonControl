@@ -9,6 +9,7 @@ import {
   Stock,
   DocumentoApp,
   EquipoApp,
+  RegistroAcabado,
 } from '../types';
 import {
   ventasService,
@@ -19,7 +20,9 @@ import {
   proyectosService,
   documentosService,
   equiposService,
+  acabadoService,
 } from '../services/api';
+import { calculateFinishedInventory } from '../utils/inventory';
 
 interface AppContextType {
   // Data
@@ -32,6 +35,7 @@ interface AppContextType {
   stocks: Stock[];
   documentos: DocumentoApp[];
   equipos: EquipoApp[];
+  acabado: RegistroAcabado[];
 
   // Actions
   addRecepcion: (data: Recepcion) => void;
@@ -42,10 +46,12 @@ interface AppContextType {
   addProyecto: (data: Proyecto) => void;
   addDocumento: (data: DocumentoApp) => void;
   addEquipo: (data: EquipoApp) => void;
+  addAcabado: (data: RegistroAcabado) => void;
   updateCliente: (id: string, data: Cliente) => void;
   updateProyecto: (id: string, data: Proyecto) => void;
   updateDocumento: (id: string, data: DocumentoApp) => void;
   updateEquipo: (id: string, data: EquipoApp) => void;
+  updateAcabado: (id: string, data: RegistroAcabado) => void;
 
   deleteRecepcion: (id: string) => void;
   deleteHornada: (id: string) => void;
@@ -53,6 +59,7 @@ interface AppContextType {
   deleteProyecto: (id: string) => void;
   deleteDocumento: (id: string) => void;
   deleteEquipo: (id: string) => void;
+  deleteAcabado: (id: string) => void;
 
   // Stats
   kpis: {
@@ -60,6 +67,9 @@ interface AppContextType {
     stockJabon: number;
     ventasMes: number;
     cobrosPendientes: number;
+    inventarioDisponible: number;
+    inventarioProducido: number;
+    inventarioVendido: number;
   };
 }
 
@@ -304,6 +314,15 @@ const demoDocumentos: DocumentoApp[] = [
   { id: 'demo-doc-6', nombre: 'Informe efluentes junio', tipo: 'otro', descripcion: 'Monitoreo ambiental mensual.', vencimiento: '', archivo: 'efluentes_junio.xlsx', fechaSubida: '2026-07-03' },
 ];
 
+const demoAcabado: RegistroAcabado[] = [
+  { id: 'demo-aca-1', fecha: '2026-07-01', area: 'compresora', operarios: 'Pedro G., Ana R.', piezas: 1200, bandejas: 24, kilos: 480, observaciones: 'Turno normal' },
+  { id: 'demo-aca-2', fecha: '2026-07-01', area: 'sellado', operarios: 'Rosa V., Miguel P.', piezas: 980, bandejas: 20, kilos: 392, observaciones: 'Sellado de cajas lote NE-1001' },
+  { id: 'demo-aca-3', fecha: '2026-07-02', area: 'compresora', operarios: 'Carlos M., Pedro G.', piezas: 1350, bandejas: 27, kilos: 540, observaciones: 'Buen rendimiento' },
+  { id: 'demo-aca-4', fecha: '2026-07-02', area: 'sellado', operarios: 'Ana R., Rosa V.', piezas: 1110, bandejas: 22, kilos: 444, observaciones: 'Empaque para cliente Comercial Norte' },
+  { id: 'demo-aca-5', fecha: '2026-07-03', area: 'compresora', operarios: 'Miguel P., Carlos M.', piezas: 1280, bandejas: 26, kilos: 512, observaciones: 'Revisar limpieza final' },
+  { id: 'demo-aca-6', fecha: '2026-07-03', area: 'sellado', operarios: 'Pedro G., Rosa V.', piezas: 1040, bandejas: 21, kilos: 416, observaciones: 'Sin novedades' },
+];
+
 const mergeDemo = <T extends { id: string }>(saved: T[], demo: T[]) => {
   const savedIds = new Set(saved.map((item) => item.id));
   return [...saved, ...demo.filter((item) => !savedIds.has(item.id))];
@@ -319,13 +338,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [stocks] = useState<Stock[]>([]);
   const [documentos, setDocumentos] = useState<DocumentoApp[]>(demoDocumentos);
   const [equipos, setEquipos] = useState<EquipoApp[]>(demoEquipos);
+  const [acabado, setAcabado] = useState<RegistroAcabado[]>(demoAcabado);
 
 
   // Cargar datos del API al montar
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const [ventasData, clientesData, hornadasData, cobrosData, materiasData, proyectosData, documentosData, equiposData] = await Promise.allSettled([
+        const [ventasData, clientesData, hornadasData, cobrosData, materiasData, proyectosData, documentosData, equiposData, acabadoData] = await Promise.allSettled([
           ventasService.listar(),
           clientesService.listar(),
           hornadasService.listar(),
@@ -334,6 +354,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           proyectosService.listar(),
           documentosService.listar(),
           equiposService.listar(),
+          acabadoService.listar(),
         ]);
 
         // Si la API responde exitosamente, actualizar los datos
@@ -353,6 +374,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (equiposData.status === 'fulfilled') {
           setEquipos(mergeDemo(equiposData.value, demoEquipos));
           if (equiposData.value.length === 0) demoEquipos.forEach((item) => equiposService.crear(item).catch(() => {}));
+        }
+        if (acabadoData.status === 'fulfilled') {
+          setAcabado(mergeDemo(acabadoData.value, demoAcabado));
+          if (acabadoData.value.length === 0) demoAcabado.forEach((item) => acabadoService.crear(item).catch(() => {}));
         }
 
         console.log('✅ Datos cargados desde el API');
@@ -392,6 +417,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const addVenta = async (data: Venta) => {
+    const inventario = calculateFinishedInventory(acabado, ventas);
+    const unidadesSolicitadas = data.formato.toLowerCase().includes('caja') ? data.cantidad * 12 : data.cantidad;
+    if (unidadesSolicitadas > inventario.disponibles) {
+      throw new Error(`Stock insuficiente. Disponible: ${inventario.disponibles} unidades.`);
+    }
+
     // Agregar localmente primero
     const dataConId = { ...data, id: data.id || Date.now().toString() };
     setVentas([...ventas, dataConId]);
@@ -512,6 +543,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addAcabado = async (data: RegistroAcabado) => {
+    const nuevo = { ...data, id: data.id || Date.now().toString() };
+    setAcabado([nuevo, ...acabado]);
+    try {
+      await acabadoService.crear(nuevo);
+    } catch (error) {
+      console.log('Error al guardar acabado en API:', error);
+    }
+  };
+
   const updateProyecto = async (id: string, data: Proyecto) => {
     const previous = proyectos.find((p) => p.id === id);
     setProyectos(proyectos.map((p) => (p.id === id ? { ...p, ...data, id } : p)));
@@ -542,6 +583,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.log('Error al actualizar equipo en API:', error);
       if (previous) setEquipos(equipos.map((e) => (e.id === id ? previous : e)));
+    }
+  };
+
+  const updateAcabado = async (id: string, data: RegistroAcabado) => {
+    const previous = acabado.find((item) => item.id === id);
+    setAcabado(acabado.map((item) => (item.id === id ? { ...item, ...data, id } : item)));
+    try {
+      await acabadoService.actualizar(id, { ...data, id });
+    } catch (error) {
+      console.log('Error al actualizar acabado en API:', error);
+      if (previous) setAcabado(acabado.map((item) => (item.id === id ? previous : item)));
     }
   };
 
@@ -578,6 +630,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteAcabado = async (id: string) => {
+    const previous = acabado;
+    setAcabado(acabado.filter((item) => item.id !== id));
+    try {
+      await acabadoService.eliminar(id);
+    } catch (error) {
+      console.log('Error al eliminar acabado en API:', error);
+      setAcabado(previous);
+    }
+  };
+
   const deleteRecepcion = async (id: string) => {
     try {
       await materiasService.eliminar(id);
@@ -608,14 +671,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const inventario = calculateFinishedInventory(acabado, ventas);
+
   const kpis = {
     produccionHoy: hornadas.reduce((sum, h) => sum + h.produccionTotal, 0),
-    stockJabon: 4210,
+    stockJabon: inventario.disponibles,
     ventasMes: ventas.reduce((sum, v) => sum + (v.total || v.precioTotal || 0), 0),
     cobrosPendientes: ventas.reduce(
       (sum, v) => sum + (v.saldoPendiente ?? (v.tipoPago === 'credito' ? (v.total || v.precioTotal || 0) : 0)),
       0
     ),
+    inventarioDisponible: inventario.disponibles,
+    inventarioProducido: inventario.producidas,
+    inventarioVendido: inventario.vendidas,
   };
 
   const value: AppContextType = {
@@ -628,6 +696,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     stocks,
     documentos,
     equipos,
+    acabado,
     addRecepcion,
     addHornada,
     addVenta,
@@ -636,16 +705,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addProyecto,
     addDocumento,
     addEquipo,
+    addAcabado,
     updateCliente,
     updateProyecto,
     updateDocumento,
     updateEquipo,
+    updateAcabado,
     deleteRecepcion,
     deleteHornada,
     deleteVenta,
     deleteProyecto,
     deleteDocumento,
     deleteEquipo,
+    deleteAcabado,
     kpis,
   };
 

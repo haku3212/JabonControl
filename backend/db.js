@@ -395,6 +395,21 @@ async function seedDemoData() {
       ['demo-fin-6', '2026-07-04', 'ingreso', 'Ventas', 'Cobro NE-1006', 'Limpieza Industrial SRL', 'transferencia', 'NE-1006', 6300, 'demo', 'Pago completo'],
     ]
   );
+
+  const acabadoDemo = [
+    { id: 'demo-aca-1', fecha: '2026-07-01', area: 'compresora', operarios: 'Pedro G., Ana R.', piezas: 1200, bandejas: 24, kilos: 480, observaciones: 'Turno normal' },
+    { id: 'demo-aca-2', fecha: '2026-07-01', area: 'sellado', operarios: 'Rosa V., Miguel P.', piezas: 980, bandejas: 20, kilos: 392, observaciones: 'Sellado de cajas lote NE-1001' },
+    { id: 'demo-aca-3', fecha: '2026-07-02', area: 'compresora', operarios: 'Carlos M., Pedro G.', piezas: 1350, bandejas: 27, kilos: 540, observaciones: 'Buen rendimiento' },
+    { id: 'demo-aca-4', fecha: '2026-07-02', area: 'sellado', operarios: 'Ana R., Rosa V.', piezas: 1110, bandejas: 22, kilos: 444, observaciones: 'Empaque para cliente Comercial Norte' },
+    { id: 'demo-aca-5', fecha: '2026-07-03', area: 'compresora', operarios: 'Miguel P., Carlos M.', piezas: 1280, bandejas: 26, kilos: 512, observaciones: 'Revisar limpieza final' },
+    { id: 'demo-aca-6', fecha: '2026-07-03', area: 'sellado', operarios: 'Pedro G., Rosa V.', piezas: 1040, bandejas: 21, kilos: 416, observaciones: 'Sin novedades' },
+  ];
+
+  await runMany(
+    `INSERT OR IGNORE INTO app_records (modulo, id, payload)
+     VALUES (?, ?, ?)`,
+    acabadoDemo.map((item) => ['acabado', item.id, JSON.stringify(item)])
+  );
 }
 
 function safeJson(value) {

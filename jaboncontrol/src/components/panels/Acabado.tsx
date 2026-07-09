@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
 import { Modal } from '../common/Modal';
-import { acabadoService } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
 import type { RegistroAcabado } from '../../types';
 
 const emptyForm: RegistroAcabado = {
@@ -16,33 +16,11 @@ const emptyForm: RegistroAcabado = {
   observaciones: '',
 };
 
-const demoAcabado: RegistroAcabado[] = [
-  { id: 'demo-aca-1', fecha: '2026-07-01', area: 'compresora', operarios: 'Pedro G., Ana R.', piezas: 1200, bandejas: 24, kilos: 480, observaciones: 'Turno normal' },
-  { id: 'demo-aca-2', fecha: '2026-07-01', area: 'sellado', operarios: 'Rosa V., Miguel P.', piezas: 980, bandejas: 20, kilos: 392, observaciones: 'Sellado de cajas lote NE-1001' },
-  { id: 'demo-aca-3', fecha: '2026-07-02', area: 'compresora', operarios: 'Carlos M., Pedro G.', piezas: 1350, bandejas: 27, kilos: 540, observaciones: 'Buen rendimiento' },
-  { id: 'demo-aca-4', fecha: '2026-07-02', area: 'sellado', operarios: 'Ana R., Rosa V.', piezas: 1110, bandejas: 22, kilos: 444, observaciones: 'Empaque para cliente Comercial Norte' },
-  { id: 'demo-aca-5', fecha: '2026-07-03', area: 'compresora', operarios: 'Miguel P., Carlos M.', piezas: 1280, bandejas: 26, kilos: 512, observaciones: 'Revisar limpieza final' },
-  { id: 'demo-aca-6', fecha: '2026-07-03', area: 'sellado', operarios: 'Pedro G., Rosa V.', piezas: 1040, bandejas: 21, kilos: 416, observaciones: 'Sin novedades' },
-];
-
 export function Acabado() {
-  const [registros, setRegistros] = useState<RegistroAcabado[]>(demoAcabado);
+  const { acabado: registros, addAcabado, updateAcabado, deleteAcabado } = useAppContext();
   const [form, setForm] = useState<RegistroAcabado>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const rows = await acabadoService.listar();
-        setRegistros(rows.length ? rows : demoAcabado);
-        if (rows.length === 0) demoAcabado.forEach((item) => acabadoService.crear(item).catch(() => {}));
-      } catch (error) {
-        console.log('Usando datos demo de acabado:', error);
-      }
-    };
-    load();
-  }, []);
 
   const resumen = useMemo(() => ({
     piezas: registros.reduce((sum, item) => sum + Number(item.piezas || 0), 0),
@@ -57,22 +35,10 @@ export function Acabado() {
     }
     if (editingId) {
       const updated = { ...form, id: editingId };
-      const previous = registros;
-      setRegistros(registros.map((item) => (item.id === editingId ? updated : item)));
-      try {
-        await acabadoService.actualizar(editingId, updated);
-      } catch (error) {
-        console.log('No se pudo actualizar acabado:', error);
-        setRegistros(previous);
-      }
+      updateAcabado(editingId, updated);
     } else {
       const nuevo = { ...form, id: Date.now().toString() };
-      setRegistros([nuevo, ...registros]);
-      try {
-        await acabadoService.crear(nuevo);
-      } catch (error) {
-        console.log('No se pudo guardar acabado:', error);
-      }
+      addAcabado(nuevo);
     }
     setForm(emptyForm);
     setEditingId(null);
@@ -87,14 +53,7 @@ export function Acabado() {
 
   const remove = async (id: string) => {
     if (confirm('Eliminar este registro de acabado?')) {
-      const previous = registros;
-      setRegistros(registros.filter((item) => item.id !== id));
-      try {
-        await acabadoService.eliminar(id);
-      } catch (error) {
-        console.log('No se pudo eliminar acabado:', error);
-        setRegistros(previous);
-      }
+      deleteAcabado(id);
     }
   };
 

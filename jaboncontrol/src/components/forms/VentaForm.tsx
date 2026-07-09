@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { unitsForSale } from '../../utils/inventory';
 
 interface VentaFormProps {
   onSave: (data: any) => Promise<void>;
@@ -7,7 +8,7 @@ interface VentaFormProps {
 }
 
 export function VentaForm({ onSave, onCancel }: VentaFormProps) {
-  const { clientes } = useAppContext();
+  const { clientes, kpis } = useAppContext();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     numeroNE: `NE-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
@@ -20,6 +21,9 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
   });
 
   const total = form.cantidad * form.precioUnitario;
+  const unidadesSolicitadas = unitsForSale(form.formato, form.cantidad);
+  const stockDisponible = kpis.inventarioDisponible;
+  const excedeStock = unidadesSolicitadas > stockDisponible;
 
   useEffect(() => {
     if (!form.cliente && clientes.length > 0) {
@@ -30,6 +34,10 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
   const handleSubmit = async () => {
     if (!form.cliente || form.cantidad <= 0 || form.precioUnitario <= 0) {
       alert('Por favor complete todos los campos correctamente');
+      return;
+    }
+    if (excedeStock) {
+      alert(`Stock insuficiente. Disponible: ${stockDisponible.toLocaleString('es-BO')} unidades. Esta venta requiere ${unidadesSolicitadas.toLocaleString('es-BO')} unidades.`);
       return;
     }
 
@@ -142,6 +150,16 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
         </div>
       </div>
 
+      <div className={`rounded border px-4 py-3 text-sm ${excedeStock ? 'border-status-danger bg-status-danger bg-opacity-10 text-status-danger' : 'border-dark-border bg-dark-surface2 text-text-secondary'}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+          <span>Inventario disponible: <strong>{stockDisponible.toLocaleString('es-BO')}</strong> unidades</span>
+          <span>Esta venta descuenta: <strong>{unidadesSolicitadas.toLocaleString('es-BO')}</strong> unidades</span>
+        </div>
+        {excedeStock && (
+          <p className="text-xs mt-2">No puedes registrar esta venta porque supera el stock terminado disponible.</p>
+        )}
+      </div>
+
       <div className="bg-dark-surface2 p-4 rounded flex justify-end items-center gap-4 mt-4">
         <span className="text-xs font-mono text-text-tertiary">TOTAL VENTA:</span>
         <span className="text-3xl font-bebas text-accent-yellow">Bs {total.toLocaleString()}</span>
@@ -157,7 +175,7 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
         </button>
         <button
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={loading || excedeStock}
           className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90 disabled:opacity-50"
         >
           {loading ? 'Guardando...' : 'Guardar Venta'}

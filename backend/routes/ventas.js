@@ -4,11 +4,21 @@ const dbModule = require('../db');
 const { v4: uuid } = require('uuid');
 const { logAudit } = require('../db');
 const { requireRoles } = require('./auth');
+const { getFinishedInventory, unitsForSale } = require('../utils/inventory');
 
 router.get('/', async (req, res) => {
   try {
     const rows = await dbModule.all('SELECT * FROM ventas ORDER BY fecha DESC');
     res.json(rows || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/inventario/disponible', async (req, res) => {
+  try {
+    const inventario = await getFinishedInventory(dbModule);
+    res.json(inventario);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -29,6 +39,15 @@ router.post('/', requireRoles('admin', 'supervisor'), async (req, res) => {
     const { numeroNE, fecha, cliente, formato, cantidad, precioUnitario, total, tipoPago } = req.body;
     if (!numeroNE || !cliente || !cantidad || !precioUnitario) {
       return res.status(400).json({ error: 'Campos requeridos' });
+    }
+
+    const inventario = await getFinishedInventory(dbModule);
+    const unidadesSolicitadas = unitsForSale(formato, cantidad);
+    if (unidadesSolicitadas > inventario.disponibles) {
+      return res.status(400).json({
+        error: `Stock insuficiente. Disponible: ${inventario.disponibles} unidades; solicitado: ${unidadesSolicitadas} unidades.`,
+        inventario,
+      });
     }
 
     const id = uuid();
