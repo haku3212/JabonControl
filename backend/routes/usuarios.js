@@ -5,6 +5,8 @@ const bcrypt = require('bcryptjs');
 const { v4: uuid } = require('uuid');
 const { logAudit } = require('../db');
 
+const VALID_ROLES = ['admin', 'supervisor', 'supervisor_ventas', 'operario'];
+
 function safeUser(user) {
   if (!user) return user;
   const { password, ...rest } = user;
@@ -36,7 +38,7 @@ router.post('/', async (req, res) => {
     if (!isStrongPassword(password)) {
       return res.status(400).json({ error: 'La contrasena debe tener minimo 8 caracteres, una letra y un numero' });
     }
-    if (!['admin', 'supervisor', 'operario'].includes(rol || 'operario')) {
+    if (!VALID_ROLES.includes(rol || 'operario')) {
       return res.status(400).json({ error: 'Rol invalido' });
     }
 
@@ -62,7 +64,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { nombre, usuario, email, password, rol, estado } = req.body;
-    if (!['admin', 'supervisor', 'operario'].includes(rol || 'operario')) {
+    if (!VALID_ROLES.includes(rol || 'operario')) {
       return res.status(400).json({ error: 'Rol invalido' });
     }
 

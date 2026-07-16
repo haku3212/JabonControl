@@ -71,18 +71,24 @@ const baseSections: NavSection[] = [
 
 export function Sidebar({ user, activePanel, onNavigate }: SidebarProps) {
   const allowed = visiblePanels(user.rol);
-  const sections: NavSection[] = user.rol === 'admin'
+  const sourceSections: NavSection[] = user.rol === 'admin'
     ? [
-        ...baseSections,
-        {
-          label: 'Admin',
-          items: [
-            { id: 'usuarios', icon: 'shield', label: 'Usuarios' },
-            { id: 'auditoria', icon: 'audit', label: 'Auditoria' },
-          ],
-        },
-      ]
+      ...baseSections,
+      {
+        label: 'Admin',
+        items: [
+          { id: 'usuarios', icon: 'shield', label: 'Usuarios' },
+          { id: 'auditoria', icon: 'audit', label: 'Auditoria' },
+        ],
+      },
+    ]
     : baseSections;
+  const sections: NavSection[] = sourceSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => allowed.has(item.id)),
+    }))
+    .filter((section) => section.items.length > 0);
   const initials = user.nombre
     .split(' ')
     .map((part) => part[0])
@@ -107,7 +113,7 @@ export function Sidebar({ user, activePanel, onNavigate }: SidebarProps) {
             <div className="px-4 py-1.5 text-xs font-mono text-text-tertiary tracking-widest uppercase">
               {section.label}
             </div>
-            {section.items.filter((item) => allowed.has(item.id)).map((item) => (
+            {section.items.map((item) => (
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}

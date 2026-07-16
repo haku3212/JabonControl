@@ -34,7 +34,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', requireRoles('admin', 'supervisor'), async (req, res) => {
+router.post('/', requireRoles('admin', 'supervisor', 'supervisor_ventas'), async (req, res) => {
   try {
     const { numeroNE, fecha, cliente, formato, cantidad, unidadesPorCaja, precioUnitario, total, tipoPago } = req.body;
     if (!numeroNE || !cliente || !cantidad || !precioUnitario) {
@@ -72,7 +72,7 @@ router.post('/', requireRoles('admin', 'supervisor'), async (req, res) => {
   }
 });
 
-router.put('/:id', requireRoles('admin', 'supervisor'), async (req, res) => {
+router.put('/:id', requireRoles('admin', 'supervisor', 'supervisor_ventas'), async (req, res) => {
   try {
     const { estado } = req.body;
     const previous = await dbModule.get('SELECT * FROM ventas WHERE id = ?', [req.params.id]);

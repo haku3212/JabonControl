@@ -29,7 +29,7 @@ import { EquipoForm } from './components/forms/EquipoForm';
 import { DocumentoForm } from './components/forms/DocumentoForm';
 import { Recibo } from './components/Recibo';
 import { Login } from './components/Login';
-import { canAccessPanel, canCreateInPanel } from './utils/permissions';
+import { canAccessPanel, canCreateInPanel, visiblePanels } from './utils/permissions';
 import { authService } from './services/api';
 
 const panelTitles: Record<string, [string, string]> = {
@@ -62,7 +62,7 @@ const modalTitles: Record<string, string> = {
 };
 
 function AppContent({ user, onLogout }: { user: { id: string; nombre: string; usuario: string; rol: string }; onLogout?: () => void }) {
-  const [activePanel, setActivePanel] = useState('dashboard');
+  const [activePanel, setActivePanel] = useState(() => Array.from(visiblePanels(user.rol))[0] || 'dashboard');
   const [modalType, setModalType] = useState<string | null>(null);
   const [notification, setNotification] = useState('');
   const [showNotification, setShowNotification] = useState(false);
@@ -78,6 +78,12 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  useEffect(() => {
+    if (!canAccessPanel(user.rol, activePanel)) {
+      setActivePanel(Array.from(visiblePanels(user.rol))[0] || 'dashboard');
+    }
+  }, [activePanel, user.rol]);
 
   const handleNavigate = (panel: string) => {
     if (!canAccessPanel(user.rol, panel)) {

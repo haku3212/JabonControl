@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', requireRoles('admin', 'supervisor'), async (req, res) => {
+router.post('/', requireRoles('admin', 'supervisor', 'supervisor_ventas'), async (req, res) => {
   try {
     const { nombre, tipo, telefono, email, ciudad, direccion } = req.body;
     if (!nombre || !tipo) {
@@ -39,7 +39,7 @@ router.post('/', requireRoles('admin', 'supervisor'), async (req, res) => {
   }
 });
 
-router.put('/:id', requireRoles('admin', 'supervisor'), async (req, res) => {
+router.put('/:id', requireRoles('admin', 'supervisor', 'supervisor_ventas'), async (req, res) => {
   try {
     const { nombre, tipo, telefono, email, ciudad, direccion } = req.body;
     const previous = await dbModule.get('SELECT * FROM clientes WHERE id = ?', [req.params.id]);

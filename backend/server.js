@@ -90,11 +90,11 @@ app.get('/api/health', (req, res) => {
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/ventas', verifyToken, ventasRoutes);
-app.use('/api/cobros', verifyToken, requireRoles('admin', 'supervisor'), cobrosRoutes);
+app.use('/api/cobros', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), cobrosRoutes);
 app.use('/api/clientes', verifyToken, clientesRoutes);
 app.use('/api/hornadas', verifyToken, hornadasRoutes);
 app.use('/api/materias', verifyToken, materiasRoutes);
-app.use('/api/finanzas', verifyToken, requireRoles('admin', 'supervisor'), finanzasRoutes);
+app.use('/api/finanzas', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), finanzasRoutes);
 app.use('/api/proyectos', verifyToken, createAppRecordsRouter('proyectos'));
 app.use('/api/documentos', verifyToken, createAppRecordsRouter('documentos'));
 app.use('/api/equipos', verifyToken, createAppRecordsRouter('equipos'));
