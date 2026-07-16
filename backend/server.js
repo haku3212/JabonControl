@@ -92,14 +92,14 @@ app.use('/api/auth', authRoutes);
 app.use('/api/ventas', verifyToken, ventasRoutes);
 app.use('/api/cobros', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), cobrosRoutes);
 app.use('/api/clientes', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'operario'), clientesRoutes);
-app.use('/api/hornadas', verifyToken, requireRoles('admin', 'supervisor', 'operario'), hornadasRoutes);
-app.use('/api/materias', verifyToken, requireRoles('admin', 'supervisor', 'operario'), materiasRoutes);
+app.use('/api/hornadas', verifyToken, requireRoles('admin', 'operario'), hornadasRoutes);
+app.use('/api/materias', verifyToken, requireRoles('admin', 'operario'), materiasRoutes);
 app.use('/api/finanzas', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), finanzasRoutes);
-app.use('/api/proyectos', verifyToken, requireRoles('admin', 'supervisor'), createAppRecordsRouter('proyectos'));
-app.use('/api/documentos', verifyToken, requireRoles('admin', 'supervisor', 'operario'), createAppRecordsRouter('documentos'));
-app.use('/api/equipos', verifyToken, requireRoles('admin', 'supervisor', 'operario'), createAppRecordsRouter('equipos'));
-app.use('/api/acabado', verifyToken, requireRoles('admin', 'supervisor', 'operario'), createAppRecordsRouter('acabado'));
-app.use('/api/contactos', verifyToken, requireRoles('admin', 'supervisor', 'operario'), createAppRecordsRouter('contactos'));
+app.use('/api/proyectos', verifyToken, requireRoles('admin'), createAppRecordsRouter('proyectos'));
+app.use('/api/documentos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('documentos'));
+app.use('/api/equipos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('equipos'));
+app.use('/api/acabado', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('acabado'));
+app.use('/api/contactos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('contactos'));
 app.use('/api/usuarios', verifyToken, requireAdmin, usuariosRoutes);
 app.get('/api/auditoria', verifyToken, requireAdmin, async (req, res) => {
   try {
