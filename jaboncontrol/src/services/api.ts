@@ -121,6 +121,9 @@ export const cobrosService = {
   async crear(data: any) {
     return apiClient.post('/cobros', data);
   },
+  async actualizar(id: string, data: any) {
+    return apiClient.put(`/cobros/${id}`, data);
+  },
   async eliminar(id: string) {
     return apiClient.delete(`/cobros/${id}`);
   },

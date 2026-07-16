@@ -4,6 +4,8 @@ import { KPICard } from '../common/KPICard';
 import { Badge } from '../common/Badge';
 import { DateRangeFilter } from '../common/DateRangeFilter';
 import { ReportDownloadModal } from '../common/ReportDownloadModal';
+import { Modal } from '../common/Modal';
+import { VentaForm } from '../forms/VentaForm';
 import { useAppContext } from '../../context/AppContext';
 import { generarReporteVenta } from '../../services/pdfService';
 import { defaultDateRange, filterByDateRange } from '../../utils/dateFilters';
@@ -11,17 +13,21 @@ import { ventaSaldoPendiente } from '../../utils/financial';
 
 interface VentasProps {
   onNewClick?: () => void;
+  userRole?: string;
 }
 
 const money = (value: number) => `Bs ${Math.round(value || 0).toLocaleString('es-BO')}`;
 
-export function Ventas({ onNewClick }: VentasProps = {}) {
+export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) {
   // Incluimos deleteVenta para poder eliminar notas con confirmacion.
-  const { ventas, kpis, deleteVenta } = useAppContext();
+  const { ventas, kpis, deleteVenta, updateVenta } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPago, setFilterPago] = useState('todos');
   const [dateRange, setDateRange] = useState(defaultDateRange());
   const [reportVenta, setReportVenta] = useState<any>(null);
+  const [editing, setEditing] = useState<any>(null);
+  const canDelete = userRole === 'admin';
+  const canEdit = ['admin', 'supervisor', 'supervisor_ventas'].includes(userRole);
 
   const ventasByDate = filterByDateRange(ventas, dateRange);
   const filteredVentas = ventasByDate.filter((v) => {
@@ -109,12 +115,19 @@ export function Ventas({ onNewClick }: VentasProps = {}) {
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex gap-2">
+                      {canEdit && (
+                        <button onClick={() => setEditing(venta)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-accent-blue hover:text-accent-blue" title="Editar nota">
+                          Editar
+                        </button>
+                      )}
                       <button onClick={() => setReportVenta(venta)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-accent-yellow hover:text-accent-yellow" title="Descargar reporte PDF">
                         PDF
                       </button>
-                      <button onClick={() => safeDelete(venta)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-status-danger hover:text-status-danger" title="Eliminar con confirmacion">
-                        Eliminar
-                      </button>
+                      {canDelete && (
+                        <button onClick={() => safeDelete(venta)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-status-danger hover:text-status-danger" title="Eliminar con confirmacion">
+                          Eliminar
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -132,6 +145,18 @@ export function Ventas({ onNewClick }: VentasProps = {}) {
         onClose={() => setReportVenta(null)}
         onConfirm={(options) => reportVenta && generarReporteVenta(reportVenta, options)}
       />
+      <Modal isOpen={Boolean(editing)} title="Editar nota de entrega" onClose={() => setEditing(null)}>
+        {editing && (
+          <VentaForm
+            initialData={editing}
+            onCancel={() => setEditing(null)}
+            onSave={async (data) => {
+              await updateVenta(editing.id, data);
+              setEditing(null);
+            }}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

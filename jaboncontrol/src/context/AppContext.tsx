@@ -61,6 +61,8 @@ interface AppContextType {
   addCotizacion: (data: Cotizacion) => void;
   addSeguimiento: (data: SeguimientoComercial) => void;
   updateCliente: (id: string, data: Cliente) => void;
+  updateVenta: (id: string, data: Venta) => void;
+  updateCobro: (id: string, data: Cobro) => void;
   updateProyecto: (id: string, data: Proyecto) => void;
   updateDocumento: (id: string, data: DocumentoApp) => void;
   updateEquipo: (id: string, data: EquipoApp) => void;
@@ -640,6 +642,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateVenta = async (id: string, data: Venta) => {
+    const previous = ventas;
+    setVentas(ventas.map((item) => item.id === id ? { ...item, ...data } : item));
+    try {
+      await ventasService.actualizar(id, data);
+      setVentas(await ventasService.listar());
+    } catch (error) {
+      console.log('Error al actualizar venta en API:', error);
+      setVentas(previous);
+      throw error;
+    }
+  };
+
+  const updateCobro = async (id: string, data: Cobro) => {
+    const previousCobros = cobros;
+    const previousVentas = ventas;
+    setCobros(cobros.map((item) => item.id === id ? { ...item, ...data } : item));
+    try {
+      await cobrosService.actualizar(id, data);
+      const [ventasActualizadas, cobrosActualizados] = await Promise.all([
+        ventasService.listar(),
+        cobrosService.listar(),
+      ]);
+      setVentas(ventasActualizadas);
+      setCobros(cobrosActualizados);
+    } catch (error) {
+      console.log('Error al actualizar cobro en API:', error);
+      setCobros(previousCobros);
+      setVentas(previousVentas);
+      throw error;
+    }
+  };
+
   const addAcabado = async (data: RegistroAcabado) => {
     const nuevo = { ...data, id: data.id || Date.now().toString() };
     setAcabado([nuevo, ...acabado]);
@@ -914,6 +949,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addCotizacion,
     addSeguimiento,
     updateCliente,
+    updateVenta,
+    updateCobro,
     updateProyecto,
     updateDocumento,
     updateEquipo,

@@ -12,7 +12,7 @@ const money = (value: number) => `Bs ${Math.round(value || 0).toLocaleString('es
 
 export function Dashboard() {
   // Cargamos los datos globales que alimentan indicadores y graficos.
-  const { ventas, hornadas, cobros, clientes, recepciones } = useAppContext();
+  const { ventas, hornadas, cobros, clientes, recepciones, documentos, equipos, kpis } = useAppContext();
 
   // El rango permite analizar dashboard por periodo sin salir de la vista.
   const [dateRange, setDateRange] = useState(defaultDateRange());
@@ -49,6 +49,43 @@ export function Dashboard() {
     const ticketPromedio = filteredVentas.length ? ventasTotal / filteredVentas.length : 0;
     return { ventasTotal, produccion, cobrado, ventasCredito, porCobrar, rendimiento, materiaPrima, ticketPromedio };
   }, [filteredVentas, filteredCobros, filteredHornadas, filteredRecepciones]);
+
+  const smartAlerts = useMemo(() => {
+    const vencenDocumentos = documentos.filter((doc) => {
+      if (!doc.vencimiento) return false;
+      const dias = Math.ceil((new Date(doc.vencimiento).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      return dias >= 0 && dias <= 30;
+    }).length;
+    const equiposAtencion = equipos.filter((equipo) => ['mantenimiento', 'reparacion'].includes(String(equipo.estado).toLowerCase())).length;
+    const bajoRendimiento = filteredHornadas.filter((hornada) => Number(hornada.rendimiento || 0) < 95).length;
+    return [
+      {
+        title: 'Stock terminado',
+        detail: `${kpis.inventarioDisponible.toLocaleString('es-BO')} unidades disponibles`,
+        tone: kpis.inventarioDisponible <= 500 ? 'warning' : 'success',
+      },
+      {
+        title: 'Cobros pendientes',
+        detail: `${money(stats.porCobrar)} en saldos por recuperar`,
+        tone: stats.porCobrar > 0 ? 'warning' : 'success',
+      },
+      {
+        title: 'Permisos por vencer',
+        detail: vencenDocumentos ? `${vencenDocumentos} documento(s) vencen en 30 dias` : 'Sin vencimientos proximos',
+        tone: vencenDocumentos ? 'warning' : 'success',
+      },
+      {
+        title: 'Equipos con atencion',
+        detail: equiposAtencion ? `${equiposAtencion} equipo(s) en mantenimiento/reparacion` : 'Equipos operativos',
+        tone: equiposAtencion ? 'warning' : 'success',
+      },
+      {
+        title: 'Rendimiento productivo',
+        detail: bajoRendimiento ? `${bajoRendimiento} hornada(s) bajo 95%` : 'Rendimiento saludable',
+        tone: bajoRendimiento ? 'warning' : 'success',
+      },
+    ] as Array<{ title: string; detail: string; tone: 'success' | 'warning' | 'info' }>;
+  }, [documentos, equipos, filteredHornadas, kpis.inventarioDisponible, stats.porCobrar]);
 
   const ultimasVentas = filteredVentas.slice(-5).reverse();
   const produccion = filteredHornadas.slice(-8);
@@ -110,9 +147,9 @@ export function Dashboard() {
 
         <Card title="Alertas prioritarias" badge={{ label: stats.porCobrar > 0 ? 'Atencion' : 'OK', type: stats.porCobrar > 0 ? 'warning' : 'success' }}>
           <div className="space-y-3">
-            <Alert title="Cobros pendientes" detail={`${money(stats.porCobrar)} en saldos por recuperar`} tone={stats.porCobrar > 0 ? 'warning' : 'success'} />
-            <Alert title="Rendimiento productivo" detail={stats.rendimiento >= 95 ? 'Rendimiento saludable' : 'Revisar receta u operacion'} tone={stats.rendimiento >= 95 ? 'success' : 'warning'} />
-            <Alert title="Compras de insumos" detail={`${recepciones.length} recepciones registradas`} tone="info" />
+            {smartAlerts.map((alert) => (
+              <Alert key={alert.title} title={alert.title} detail={alert.detail} tone={alert.tone} />
+            ))}
           </div>
         </Card>
       </div>

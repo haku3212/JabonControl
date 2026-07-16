@@ -5,26 +5,28 @@ import { UNIDADES_POR_CAJA, unitsForSale } from '../../utils/inventory';
 interface VentaFormProps {
   onSave: (data: any) => Promise<void>;
   onCancel: () => void;
+  initialData?: any;
 }
 
-export function VentaForm({ onSave, onCancel }: VentaFormProps) {
+export function VentaForm({ onSave, onCancel, initialData }: VentaFormProps) {
   const { clientes, kpis } = useAppContext();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    numeroNE: `NE-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
-    fecha: new Date().toISOString().split('T')[0],
-    cliente: '',
-    formato: 'Cajas',
-    cantidad: 0,
-    unidadesPorCaja: UNIDADES_POR_CAJA,
-    precioUnitario: 0,
-    tipoPago: 'contado' as 'contado' | 'credito',
+    numeroNE: initialData?.numeroNE || `NE-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
+    fecha: initialData?.fecha || new Date().toISOString().split('T')[0],
+    cliente: initialData?.cliente || '',
+    formato: initialData?.formato || 'Cajas',
+    cantidad: Number(initialData?.cantidad || 0),
+    unidadesPorCaja: Number(initialData?.unidadesPorCaja || UNIDADES_POR_CAJA),
+    precioUnitario: Number(initialData?.precioUnitario || 0),
+    tipoPago: (initialData?.tipoPago || 'contado') as 'contado' | 'credito',
   });
 
   const total = form.cantidad * form.precioUnitario;
   const esCaja = form.formato.toLowerCase().includes('caja');
   const unidadesSolicitadas = unitsForSale(form.formato, form.cantidad, form.unidadesPorCaja);
-  const stockDisponible = kpis.inventarioDisponible;
+  const unidadesOriginales = initialData ? unitsForSale(initialData.formato, Number(initialData.cantidad || 0), Number(initialData.unidadesPorCaja || UNIDADES_POR_CAJA)) : 0;
+  const stockDisponible = kpis.inventarioDisponible + unidadesOriginales;
   const excedeStock = unidadesSolicitadas > stockDisponible;
 
   const handleSubmit = async () => {
@@ -45,7 +47,7 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
     try {
       await onSave({
         ...form,
-        id: Date.now().toString(),
+        id: initialData?.id || Date.now().toString(),
         total,
         precioTotal: total,
       });
@@ -65,8 +67,8 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
           <input
             type="text"
             value={form.numeroNE}
-            readOnly
-            className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-accent-yellow text-sm outline-none"
+            onChange={(e) => setForm({ ...form, numeroNE: e.target.value })}
+            className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-accent-yellow text-sm focus:border-accent-yellow outline-none"
           />
         </div>
         <div>
@@ -203,7 +205,7 @@ export function VentaForm({ onSave, onCancel }: VentaFormProps) {
           disabled={loading || excedeStock}
           className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90 disabled:opacity-50"
         >
-          {loading ? 'Guardando...' : 'Guardar Venta'}
+          {loading ? 'Guardando...' : initialData ? 'Guardar cambios' : 'Guardar Venta'}
         </button>
       </div>
     </div>

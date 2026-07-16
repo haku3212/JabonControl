@@ -9,7 +9,7 @@ interface Usuario {
   nombre: string;
   usuario: string;
   email?: string;
-  rol: 'admin' | 'supervisor' | 'supervisor_ventas' | 'operario';
+  rol: 'admin' | 'supervisor' | 'supervisor_ventas' | 'finanzas' | 'operario';
   estado: 'activo' | 'inactivo';
   ultimo_acceso?: string;
 }
@@ -134,6 +134,7 @@ export function Usuarios() {
             <div className="grid grid-cols-2 gap-3">
               <Select label="Rol" value={form.rol} onChange={(value) => setForm({ ...form, rol: value as Usuario['rol'] })}>
                 <option value="operario">Operario</option>
+                <option value="finanzas">Finanzas</option>
                 <option value="supervisor">Supervisor</option>
                 <option value="supervisor_ventas">Supervisor de ventas</option>
                 <option value="admin">Admin</option>

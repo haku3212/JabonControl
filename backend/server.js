@@ -90,13 +90,13 @@ app.get('/api/health', (req, res) => {
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/ventas', verifyToken, ventasRoutes);
-app.use('/api/cobros', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), cobrosRoutes);
-app.use('/api/clientes', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'operario'), clientesRoutes);
+app.use('/api/cobros', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), cobrosRoutes);
+app.use('/api/clientes', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas', 'operario'), clientesRoutes);
 app.use('/api/hornadas', verifyToken, requireRoles('admin', 'operario'), hornadasRoutes);
 app.use('/api/materias', verifyToken, requireRoles('admin', 'operario'), materiasRoutes);
-app.use('/api/finanzas', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), finanzasRoutes);
-app.use('/api/cotizaciones', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), createAppRecordsRouter('cotizaciones'));
-app.use('/api/seguimientos', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), createAppRecordsRouter('seguimientos'));
+app.use('/api/finanzas', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), finanzasRoutes);
+app.use('/api/cotizaciones', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), createAppRecordsRouter('cotizaciones'));
+app.use('/api/seguimientos', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), createAppRecordsRouter('seguimientos'));
 app.use('/api/proyectos', verifyToken, requireRoles('admin'), createAppRecordsRouter('proyectos'));
 app.use('/api/documentos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('documentos'));
 app.use('/api/equipos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('equipos'));

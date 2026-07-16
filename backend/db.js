@@ -315,7 +315,7 @@ async function seedDemoData() {
       ['demo-user-1', 'Supervisor Planta', 'supervisor', 'supervisor@jaboncontrol.local', demoPass, 'supervisor', 'activo'],
       ['demo-user-2', 'Operario Produccion', 'operario', 'operario@jaboncontrol.local', demoPass, 'operario', 'activo'],
       ['demo-user-3', 'Encargada Ventas', 'ventas', 'ventas@jaboncontrol.local', demoPass, 'supervisor', 'activo'],
-      ['demo-user-4', 'Responsable Finanzas', 'finanzas', 'finanzas@jaboncontrol.local', demoPass, 'supervisor', 'activo'],
+      ['demo-user-4', 'Responsable Finanzas', 'finanzas', 'finanzas@jaboncontrol.local', demoPass, 'finanzas', 'activo'],
       ['demo-user-5', 'Control Calidad', 'calidad', 'calidad@jaboncontrol.local', demoPass, 'operario', 'activo'],
       ['demo-user-6', 'Usuario Inactivo', 'inactivo', 'inactivo@jaboncontrol.local', demoPass, 'operario', 'inactivo'],
     ]

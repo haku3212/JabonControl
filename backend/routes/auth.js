@@ -11,7 +11,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'jaboncontrol_secret_2026_cambiar_e
 const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
 const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || 'jc_session';
 const PASSWORD_MAX_DAYS = Number(process.env.PASSWORD_MAX_DAYS || 180);
-const VALID_ROLES = ['admin', 'supervisor', 'supervisor_ventas', 'operario'];
+const VALID_ROLES = ['admin', 'supervisor', 'supervisor_ventas', 'finanzas', 'operario'];
 
 // Bloqueo temporal por usuario, adicional al rate limit por IP.
 const loginFailures = new Map();

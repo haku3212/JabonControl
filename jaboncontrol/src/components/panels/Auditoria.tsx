@@ -27,6 +27,9 @@ export function Auditoria() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('todos');
+  const [actionFilter, setActionFilter] = useState('todos');
+  const [userFilter, setUserFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const [error, setError] = useState('');
 
   const load = async (silent = false) => {
@@ -48,7 +51,37 @@ export function Auditoria() {
   }, []);
 
   const tables = useMemo(() => ['todos', ...Array.from(new Set(logs.map((log) => log.tabla)))], [logs]);
-  const filtered = filter === 'todos' ? logs : logs.filter((log) => log.tabla === filter);
+  const actions = useMemo(() => ['todos', ...Array.from(new Set(logs.map((log) => log.accion)))], [logs]);
+  const filtered = logs.filter((log) => {
+    const byTable = filter === 'todos' || log.tabla === filter;
+    const byAction = actionFilter === 'todos' || log.accion === actionFilter;
+    const byUser = !userFilter || String(log.usuario || '').toLowerCase().includes(userFilter.toLowerCase());
+    const byDate = !dateFilter || String(log.creado_en || '').startsWith(dateFilter);
+    return byTable && byAction && byUser && byDate;
+  });
+
+  const exportCsv = () => {
+    const headers = ['fecha', 'usuario', 'rol', 'accion', 'modulo', 'registro', 'detalle'];
+    const rows = filtered.map((log) => [
+      log.creado_en,
+      log.usuario || 'sistema',
+      log.rol || '',
+      log.accion,
+      log.tabla,
+      log.registro_id || '',
+      log.detalle || '',
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `auditoria_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-5">
@@ -57,12 +90,20 @@ export function Auditoria() {
           <h1 className="text-2xl font-bebas tracking-wider text-text-primary">Auditoria en tiempo real</h1>
           <p className="text-sm text-text-tertiary">Historial visible solo para administradores. Se actualiza cada 5 segundos.</p>
         </div>
-        <button
-          onClick={() => load()}
-          className="px-3 py-2 bg-dark-surface3 border border-dark-border rounded text-sm text-text-secondary hover:border-accent-yellow hover:text-accent-yellow"
-        >
-          Actualizar
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={exportCsv}
+            className="px-3 py-2 bg-accent-yellow text-black rounded text-sm font-semibold hover:bg-opacity-90"
+          >
+            Exportar CSV
+          </button>
+          <button
+            onClick={() => load()}
+            className="px-3 py-2 bg-dark-surface3 border border-dark-border rounded text-sm text-text-secondary hover:border-accent-yellow hover:text-accent-yellow"
+          >
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -72,20 +113,27 @@ export function Auditoria() {
       )}
 
       <Card title="Filtros">
-        <div className="flex flex-wrap gap-2">
-          {tables.map((table) => (
-            <button
-              key={table}
-              onClick={() => setFilter(table)}
-              className={`px-3 py-1.5 rounded border text-sm ${
-                filter === table
-                  ? 'bg-accent-yellow text-black border-accent-yellow'
-                  : 'bg-dark-surface2 text-text-secondary border-dark-border hover:text-text-primary'
-              }`}
-            >
-              {table}
-            </button>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <label className="block">
+            <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">Modulo</span>
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-sm text-text-primary">
+              {tables.map((table) => <option key={table} value={table}>{table}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">Accion</span>
+            <select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)} className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-sm text-text-primary">
+              {actions.map((action) => <option key={action} value={action}>{action}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">Usuario</span>
+            <input value={userFilter} onChange={(event) => setUserFilter(event.target.value)} className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-sm text-text-primary" placeholder="admin, ventas..." />
+          </label>
+          <label className="block">
+            <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">Fecha</span>
+            <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-sm text-text-primary" />
+          </label>
         </div>
       </Card>
 

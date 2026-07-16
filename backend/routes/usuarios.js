@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const { v4: uuid } = require('uuid');
 const { logAudit } = require('../db');
 
-const VALID_ROLES = ['admin', 'supervisor', 'supervisor_ventas', 'operario'];
+const VALID_ROLES = ['admin', 'supervisor', 'supervisor_ventas', 'finanzas', 'operario'];
 
 function safeUser(user) {
   if (!user) return user;
