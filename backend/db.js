@@ -559,7 +559,7 @@ async function initDB() {
   await initStorage();
   await createTables();
   await ensureAdmin();
-  if (process.env.ENABLE_DEMO_DATA === 'true' || process.env.NODE_ENV !== 'production') {
+  if (process.env.ENABLE_DEMO_DATA === 'true') {
     await seedDemoData();
   }
   await backfillAuditHashes();
