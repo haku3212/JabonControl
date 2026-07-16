@@ -362,6 +362,7 @@ export function App() {
 
     const clearSession = () => {
       localStorage.removeItem('jc_user');
+      sessionStorage.removeItem('jc_token');
       setUser(null);
       setCheckingSession(false);
     };
@@ -401,6 +402,7 @@ export function App() {
       // Aunque el backend no responda, cerramos la sesion visualmente en este navegador.
     }
     localStorage.removeItem('jc_user');
+    sessionStorage.removeItem('jc_token');
     setUser(null);
   };
 

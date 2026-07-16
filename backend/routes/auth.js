@@ -139,6 +139,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     setAuthCookie(res, token);
     res.json({
+      token: process.env.AUTH_COOKIE_ONLY === 'true' ? undefined : token,
       user: {
         id: user.id,
         nombre: user.nombre,

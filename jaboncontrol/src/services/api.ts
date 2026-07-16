@@ -13,6 +13,7 @@ async function parseResponse(response: Response, endpoint: string) {
   if (!response.ok) {
     if (response.status === 401 && endpoint !== '/auth/login') {
       localStorage.removeItem('jc_user');
+      sessionStorage.removeItem('jc_token');
       window.dispatchEvent(new Event('jc:auth-expired'));
       throw new Error('Sesion expirada. Inicie sesion nuevamente.');
     }
@@ -21,14 +22,18 @@ async function parseResponse(response: Response, endpoint: string) {
   return data;
 }
 
-const requestOptions = (method: string, data?: any): RequestInit => ({
-  method,
-  credentials: 'include',
-  headers: {
+const requestOptions = (method: string, data?: any): RequestInit => {
+  const token = sessionStorage.getItem('jc_token');
+  return {
+    method,
+    credentials: 'include',
+    headers: {
     'Content-Type': 'application/json',
-  },
-  ...(data === undefined ? {} : { body: JSON.stringify(data) }),
-});
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+  };
+};
 
 export const apiClient = {
   async get(endpoint: string) {

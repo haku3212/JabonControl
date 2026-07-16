@@ -23,6 +23,7 @@ export function Login({ onLogin }: LoginProps) {
     try {
       const response = await authService.login(usuario, password);
       if (response.user) {
+        if (response.token) sessionStorage.setItem('jc_token', response.token);
         localStorage.setItem('jc_user', JSON.stringify(response.user));
         onLogin(response.user);
       } else {
