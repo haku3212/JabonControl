@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import QRCode from 'qrcode';
 import { useAppContext } from '../../context/AppContext';
 
 interface CobroFormProps {
@@ -26,9 +25,6 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
 
   // Evita que el usuario envie el formulario dos veces mientras guarda.
   const [loading, setLoading] = useState(false);
-
-  // Referencia del contenedor donde se dibuja el QR de pago.
-  const qrRef = useRef<HTMLDivElement>(null);
 
   // Calcula el saldo real de una venta; si no existe saldoPendiente, usa el total solo cuando es credito.
   const getSaldoVenta = (venta: any) => (
@@ -99,28 +95,6 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
   // Excedente si el usuario cobra mas de lo adeudado.
   const excedente = Math.round((monto - totalAplicado) * 100) / 100;
 
-  // Texto codificado para el QR local de pago.
-  const datosQR = `BANCO|${monto}|${clienteSeleccionado}-${fecha}`;
-
-  // Dibuja el QR cuando el metodo es QR y hay monto valido.
-  useEffect(() => {
-    // Si no hay contenedor, no hacemos nada.
-    if (!qrRef.current) return;
-
-    // Solo generamos QR cuando el usuario eligio ese metodo.
-    if (metodoPago !== 'qr' || monto <= 0) return;
-
-    // Limpiamos el QR anterior antes de dibujar uno nuevo.
-    qrRef.current.innerHTML = '';
-
-    // Generamos el canvas del QR.
-    QRCode.toCanvas(qrRef.current, datosQR, {
-      width: 250,
-      margin: 2,
-      color: { dark: '#000000', light: '#FFFFFF' },
-    }).catch((error: unknown) => console.error('Error QR:', error));
-  }, [datosQR, metodoPago, monto]);
-
   // Envia el cobro al contexto/app.
   const handleSubmit = async () => {
     // Validamos que el usuario haya elegido un cliente deudor y un monto positivo.
@@ -163,27 +137,6 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
       // Siempre liberamos el formulario.
       setLoading(false);
     }
-  };
-
-  // Descarga el QR actual como PNG.
-  const downloadQR = () => {
-    // Buscamos el canvas generado por qrcode.
-    const canvas = qrRef.current?.querySelector('canvas') as HTMLCanvasElement | null;
-
-    // Si aun no hay canvas, salimos sin error.
-    if (!canvas) return;
-
-    // Creamos un enlace temporal de descarga.
-    const link = document.createElement('a');
-
-    // Convertimos el canvas a imagen PNG.
-    link.href = canvas.toDataURL('image/png');
-
-    // Nombramos el archivo con cliente y fecha.
-    link.download = `QR_${clienteSeleccionado}_${fecha}.png`;
-
-    // Ejecutamos la descarga.
-    link.click();
   };
 
   return (
@@ -258,7 +211,6 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
             >
               <option value="efectivo">Efectivo</option>
               <option value="transferencia">Transferencia</option>
-              <option value="qr">QR Banco</option>
             </select>
           </Field>
 
@@ -271,33 +223,6 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
                 className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
               />
             </Field>
-          </div>
-        </div>
-      )}
-
-      {metodoPago === 'qr' && monto > 0 && clienteSeleccionado && (
-        <div className="bg-dark-surface2 p-6 rounded border-2 border-accent-yellow border-opacity-50">
-          <div className="text-xs font-mono text-text-tertiary uppercase mb-3 text-center">
-            Codigo QR Banco
-          </div>
-          <div className="flex flex-col items-center gap-4">
-            <div className="bg-white p-4 rounded-lg shadow-lg">
-              <div ref={qrRef} className="flex justify-center" />
-            </div>
-            <div className="text-center w-full">
-              <div className="text-sm text-text-secondary mb-2">
-                Cliente: <strong>{clienteSeleccionado}</strong>
-              </div>
-              <div className="text-3xl font-bebas text-accent-yellow mb-2">
-                Bs {monto.toLocaleString('es-BO', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-xs text-text-tertiary font-mono">
-                Fecha: {fecha}
-              </div>
-            </div>
-            <button onClick={downloadQR} className="w-full px-3 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90">
-              Descargar QR
-            </button>
           </div>
         </div>
       )}

@@ -279,7 +279,7 @@ const demoProyectos: Proyecto[] = [
     tareas: [
       { id: 'p4-t1', texto: 'Subir licencia ambiental vigente', completada: true },
       { id: 'p4-t2', texto: 'Adjuntar informe de efluentes', completada: true },
-      { id: 'p4-t3', texto: 'Generar QR de verificacion', completada: false },
+      { id: 'p4-t3', texto: 'Preparar respaldo de verificacion', completada: false },
     ],
   },
   {

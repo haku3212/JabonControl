@@ -14,7 +14,6 @@ interface ReciboProps {
 const metodoLabel: Record<string, string> = {
   efectivo: 'Efectivo',
   transferencia: 'Transferencia',
-  qr: 'QR Banco',
   cheque: 'Cheque',
 };
 

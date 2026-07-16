@@ -1,7 +1,6 @@
-import { Card } from '../common/Card';
+﻿import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
-import { useState, useRef, useEffect } from 'react';
-import QRCode from 'qrcode';
+import { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 
 interface DocumentacionProps {
@@ -10,33 +9,24 @@ interface DocumentacionProps {
 
 const tipoLabels: Record<string, string> = {
   permiso: 'Permiso/Licencia',
-  'ficha-tecnica': 'Ficha Técnica',
+  'ficha-tecnica': 'Ficha TÃ©cnica',
   otro: 'Otro',
 };
 
 export function Documentacion({ onNewClick }: DocumentacionProps) {
   const { documentos, deleteDocumento } = useAppContext();
-  const [docQR, setDocQR] = useState<string | null>(null);
-  const qrRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (qrRef.current && docQR) {
-      qrRef.current.innerHTML = '';
-      const datosQR = `DOC|${docQR}|VERIFICABLE`;
-      QRCode.toCanvas(qrRef.current, datosQR, {
-        width: 200,
-        margin: 2,
-        color: { dark: '#000000', light: '#FFFFFF' },
-      }).catch((err: unknown) => console.error('Error QR:', err));
-    }
-  }, [docQR]);
+  const [permisos, setPermisos] = useState<Array<{ doc: string; nivel: string; venc: string; est: 'success' | 'warning' | 'danger' }>>([
+    { doc: 'Licencia Ambiental', nivel: 'Municipal', venc: '31/12/2026', est: 'success' },
+    { doc: 'Registro SENASAG', nivel: 'Nacional', venc: '15/08/2026', est: 'warning' },
+    { doc: 'Habilitacion Depto', nivel: 'Departamental', venc: '30/06/2026', est: 'danger' },
+  ]);
 
   const verDocumento = (doc: { archivo: string; archivoData?: string }) => {
     if (!doc.archivoData) {
       alert('Este documento no tiene archivo adjunto disponible');
       return;
     }
-    // Abrir en nueva pestaña
+    // Abrir en nueva pestaÃ±a
     const win = window.open();
     if (win) {
       if (doc.archivoData.startsWith('data:application/pdf') || doc.archivoData.startsWith('data:image')) {
@@ -64,8 +54,14 @@ export function Documentacion({ onNewClick }: DocumentacionProps) {
   };
 
   const handleEliminar = (id: string, nombre: string) => {
-    if (confirm(`¿Eliminar el documento "${nombre}"?`)) {
+    if (confirm(`Â¿Eliminar el documento "${nombre}"?`)) {
       deleteDocumento(id);
+    }
+  };
+
+  const handleEliminarPermiso = (nombre: string) => {
+    if (confirm(`Â¿Eliminar el permiso "${nombre}"?`)) {
+      setPermisos((actuales) => actuales.filter((permiso) => permiso.doc !== nombre));
     }
   };
 
@@ -81,8 +77,8 @@ export function Documentacion({ onNewClick }: DocumentacionProps) {
     <div className="space-y-6">
       <div className="flex justify-between items-start mb-4 gap-2 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bebas tracking-wider">Documentación</h1>
-          <p className="text-xs font-mono text-text-tertiary mt-1">PERMISOS, AMBIENTAL Y TÉCNICO</p>
+          <h1 className="text-3xl font-bebas tracking-wider">DocumentaciÃ³n</h1>
+          <p className="text-xs font-mono text-text-tertiary mt-1">PERMISOS, AMBIENTAL Y TÃ‰CNICO</p>
         </div>
         <button
           onClick={onNewClick}
@@ -96,16 +92,16 @@ export function Documentacion({ onNewClick }: DocumentacionProps) {
       <Card title={`Mis Documentos (${documentos.length})`}>
         {documentos.length === 0 ? (
           <div className="text-center py-8">
-            <div className="text-4xl mb-3">📂</div>
-            <p className="text-sm text-text-secondary mb-1">No hay documentos subidos todavía</p>
+            <div className="text-4xl mb-3">ðŸ“‚</div>
+            <p className="text-sm text-text-secondary mb-1">No hay documentos subidos todavÃ­a</p>
             <p className="text-xs text-text-tertiary mb-4">
-              Sube tus permisos, fichas técnicas, historiales y más en PDF, Word, Excel o imágenes
+              Sube tus permisos, fichas tÃ©cnicas, historiales y mÃ¡s en PDF, Word, Excel o imÃ¡genes
             </p>
             <button
               onClick={onNewClick}
               className="px-4 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
             >
-              📁 Subir mi primer documento
+              ðŸ“ Subir mi primer documento
             </button>
           </div>
         ) : (
@@ -130,7 +126,7 @@ export function Documentacion({ onNewClick }: DocumentacionProps) {
                         )}
                       </td>
                       <td className="px-2 py-2 text-text-secondary text-xs">{tipoLabels[doc.tipo] || doc.tipo}</td>
-                      <td className="px-2 py-2 font-mono text-text-secondary text-xs">📄 {doc.archivo}</td>
+                      <td className="px-2 py-2 font-mono text-text-secondary text-xs">ðŸ“„ {doc.archivo}</td>
                       <td className="px-2 py-2 font-mono text-text-secondary text-xs">{doc.fechaSubida}</td>
                       <td className="px-2 py-2">
                         <Badge label={estado.label} type={estado.type} />
@@ -142,28 +138,21 @@ export function Documentacion({ onNewClick }: DocumentacionProps) {
                             className="text-xs px-2 py-1 bg-dark-surface3 rounded border border-dark-border hover:border-accent-yellow"
                             title="Ver documento"
                           >
-                            👁️ Ver
+                            ðŸ‘ï¸ Ver
                           </button>
                           <button
                             onClick={() => descargarDocumento(doc)}
                             className="text-xs px-2 py-1 bg-dark-surface3 rounded border border-dark-border hover:border-accent-yellow"
                             title="Descargar"
                           >
-                            ⬇️
-                          </button>
-                          <button
-                            onClick={() => setDocQR(doc.nombre)}
-                            className="text-xs px-2 py-1 bg-accent-yellow text-black rounded hover:bg-opacity-90"
-                            title="Código QR"
-                          >
-                            📱
+                            â¬‡ï¸
                           </button>
                           <button
                             onClick={() => handleEliminar(doc.id, doc.nombre)}
                             className="text-xs px-2 py-1 bg-dark-surface3 rounded border border-dark-border hover:border-status-danger hover:text-status-danger"
                             title="Eliminar"
                           >
-                            🗑️
+                            ðŸ—‘ï¸
                           </button>
                         </div>
                       </td>
@@ -188,27 +177,30 @@ export function Documentacion({ onNewClick }: DocumentacionProps) {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  { doc: 'Licencia Ambiental', nivel: 'Municipal', venc: '31/12/2026', est: 'success' },
-                  { doc: 'Registro SENASAG', nivel: 'Nacional', venc: '15/08/2026', est: 'warning' },
-                  { doc: 'Habilitación Depto', nivel: 'Departamental', venc: '30/06/2026', est: 'danger' },
-                ].map((row) => (
+                {permisos.map((row) => (
                   <tr key={row.doc} className="border-b border-dark-border hover:bg-dark-surface2">
                     <td className="px-2 py-2 text-text-secondary text-xs">{row.doc}</td>
                     <td className="px-2 py-2 font-mono text-text-secondary text-xs">{row.nivel}</td>
                     <td className="px-2 py-2 font-mono text-text-secondary text-xs">{row.venc}</td>
-                    <td className="px-2 py-2"><Badge label={row.est === 'success' ? 'Vigente' : row.est === 'warning' ? 'Por renovar' : 'Vence pronto'} type={row.est as 'success' | 'warning' | 'danger'} /></td>
+                    <td className="px-2 py-2"><Badge label={row.est === 'success' ? 'Vigente' : row.est === 'warning' ? 'Por renovar' : 'Vence pronto'} type={row.est} /></td>
                     <td className="px-2 py-2">
-                      <button onClick={() => setDocQR(row.doc)} className="text-xs px-2 py-1 bg-accent-yellow text-black rounded hover:bg-opacity-90">📱 QR</button>
+                      <button onClick={() => handleEliminarPermiso(row.doc)} className="text-xs px-2 py-1 bg-dark-surface3 rounded border border-dark-border hover:border-status-danger hover:text-status-danger">Eliminar</button>
                     </td>
                   </tr>
                 ))}
+                {permisos.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-2 py-6 text-center text-xs text-text-tertiary">
+                      No hay permisos registrados.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </Card>
 
-        <Card title="Fichas Técnicas">
+        <Card title="Fichas TÃ©cnicas">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -238,12 +230,12 @@ export function Documentacion({ onNewClick }: DocumentacionProps) {
           <div className="space-y-3">
             <div className="p-3 bg-status-success bg-opacity-10 rounded border-l-4 border-status-success">
               <div className="text-xs font-semibold mb-1">Plan de Manejo Ambiental</div>
-              <p className="text-xs text-text-tertiary mb-2">Última actualización: Marzo 2026</p>
+              <p className="text-xs text-text-tertiary mb-2">Ãšltima actualizaciÃ³n: Marzo 2026</p>
               <button
                 onClick={onNewClick}
                 className="text-xs px-2 py-1 bg-dark-surface3 rounded border border-dark-border hover:border-accent-yellow"
               >
-                📁 Cargar documento
+                ðŸ“ Cargar documento
               </button>
             </div>
             <div className="p-3 bg-accent-blue bg-opacity-10 rounded border-l-4 border-accent-blue">
@@ -253,56 +245,14 @@ export function Documentacion({ onNewClick }: DocumentacionProps) {
                 onClick={onNewClick}
                 className="text-xs px-2 py-1 bg-dark-surface3 rounded border border-dark-border hover:border-accent-yellow"
               >
-                📁 Cargar informe
+                ðŸ“ Cargar informe
               </button>
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Modal QR para Documentación */}
-      {docQR && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setDocQR(null)}>
-          <div className="bg-dark-surface border border-dark-border rounded-lg p-6 max-w-md w-full fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4">
-              <div className="text-lg font-bebas text-accent-yellow">📱 Verificación - {docQR}</div>
-              <button onClick={() => setDocQR(null)} className="text-xl text-text-tertiary hover:text-text-primary">✕</button>
-            </div>
-
-            <div className="bg-white p-4 rounded-lg flex justify-center mb-4">
-              <div ref={qrRef}></div>
-            </div>
-
-            <div className="text-center text-xs text-text-secondary mb-4">
-              <div className="font-mono">DOCUMENTO VERIFICABLE</div>
-              <div className="text-text-tertiary">Escanear para validación digital</div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (qrRef.current?.querySelector('canvas')) {
-                    const canvas = qrRef.current.querySelector('canvas') as HTMLCanvasElement;
-                    const link = document.createElement('a');
-                    link.href = canvas.toDataURL('image/png');
-                    link.download = `QR_${docQR}.png`;
-                    link.click();
-                  }
-                }}
-                className="flex-1 px-3 py-2 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90"
-              >
-                ⬇️ Descargar
-              </button>
-              <button
-                onClick={() => setDocQR(null)}
-                className="flex-1 px-3 py-2 bg-dark-surface3 text-text-primary text-xs font-medium rounded border border-dark-border"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
