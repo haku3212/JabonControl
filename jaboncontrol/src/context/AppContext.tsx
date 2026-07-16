@@ -398,20 +398,23 @@ const mergeDemo = <T extends { id: string }>(saved: T[], demo: T[]) => {
   return [...saved, ...demo.filter((item) => !savedIds.has(item.id))];
 };
 
+const env = import.meta.env as ImportMetaEnv & Record<string, string | undefined>;
+const useDemoData = import.meta.env.DEV || env.VITE_ENABLE_DEMO_DATA === 'true';
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [recepciones, setRecepciones] = useState<Recepcion[]>(initialRecepcion);
-  const [hornadas, setHornadas] = useState<Hornada[]>(initialHornadas);
-  const [ventas, setVentas] = useState<Venta[]>(initialVentas);
-  const [cobros, setCobros] = useState<Cobro[]>(initialCobros);
-  const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
-  const [proyectos, setProyectos] = useState<Proyecto[]>(demoProyectos);
+  const [recepciones, setRecepciones] = useState<Recepcion[]>(useDemoData ? initialRecepcion : []);
+  const [hornadas, setHornadas] = useState<Hornada[]>(useDemoData ? initialHornadas : []);
+  const [ventas, setVentas] = useState<Venta[]>(useDemoData ? initialVentas : []);
+  const [cobros, setCobros] = useState<Cobro[]>(useDemoData ? initialCobros : []);
+  const [clientes, setClientes] = useState<Cliente[]>(useDemoData ? initialClientes : []);
+  const [proyectos, setProyectos] = useState<Proyecto[]>(useDemoData ? demoProyectos : []);
   const [stocks] = useState<Stock[]>([]);
-  const [documentos, setDocumentos] = useState<DocumentoApp[]>(demoDocumentos);
-  const [equipos, setEquipos] = useState<EquipoApp[]>(demoEquipos);
-  const [acabado, setAcabado] = useState<RegistroAcabado[]>(demoAcabado);
-  const [contactos, setContactos] = useState<ContactoEmpresa[]>(demoContactos);
-  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(demoCotizaciones);
-  const [seguimientos, setSeguimientos] = useState<SeguimientoComercial[]>(demoSeguimientos);
+  const [documentos, setDocumentos] = useState<DocumentoApp[]>(useDemoData ? demoDocumentos : []);
+  const [equipos, setEquipos] = useState<EquipoApp[]>(useDemoData ? demoEquipos : []);
+  const [acabado, setAcabado] = useState<RegistroAcabado[]>(useDemoData ? demoAcabado : []);
+  const [contactos, setContactos] = useState<ContactoEmpresa[]>(useDemoData ? demoContactos : []);
+  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(useDemoData ? demoCotizaciones : []);
+  const [seguimientos, setSeguimientos] = useState<SeguimientoComercial[]>(useDemoData ? demoSeguimientos : []);
 
 
   // Cargar datos del API al montar
@@ -440,35 +443,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (cobrosData.status === 'fulfilled') setCobros(cobrosData.value);
         if (materiasData.status === 'fulfilled') setRecepciones(materiasData.value);
         if (proyectosData.status === 'fulfilled') {
-          setProyectos(mergeDemo(proyectosData.value, demoProyectos));
-          const savedProjectIds = new Set(proyectosData.value.map((item: Proyecto) => item.id));
-          demoProyectos
-            .filter((item) => !savedProjectIds.has(item.id))
-            .forEach((item) => proyectosService.crear(item).catch(() => {}));
+          setProyectos(useDemoData ? mergeDemo(proyectosData.value, demoProyectos) : proyectosData.value);
+          if (useDemoData) {
+            const savedProjectIds = new Set(proyectosData.value.map((item: Proyecto) => item.id));
+            demoProyectos
+              .filter((item) => !savedProjectIds.has(item.id))
+              .forEach((item) => proyectosService.crear(item).catch(() => {}));
+          }
         }
         if (documentosData.status === 'fulfilled') {
-          setDocumentos(mergeDemo(documentosData.value, demoDocumentos));
-          if (documentosData.value.length === 0) demoDocumentos.forEach((item) => documentosService.crear(item).catch(() => {}));
+          setDocumentos(useDemoData ? mergeDemo(documentosData.value, demoDocumentos) : documentosData.value);
+          if (useDemoData && documentosData.value.length === 0) demoDocumentos.forEach((item) => documentosService.crear(item).catch(() => {}));
         }
         if (equiposData.status === 'fulfilled') {
-          setEquipos(mergeDemo(equiposData.value, demoEquipos));
-          if (equiposData.value.length === 0) demoEquipos.forEach((item) => equiposService.crear(item).catch(() => {}));
+          setEquipos(useDemoData ? mergeDemo(equiposData.value, demoEquipos) : equiposData.value);
+          if (useDemoData && equiposData.value.length === 0) demoEquipos.forEach((item) => equiposService.crear(item).catch(() => {}));
         }
         if (acabadoData.status === 'fulfilled') {
-          setAcabado(mergeDemo(acabadoData.value, demoAcabado));
-          if (acabadoData.value.length === 0) demoAcabado.forEach((item) => acabadoService.crear(item).catch(() => {}));
+          setAcabado(useDemoData ? mergeDemo(acabadoData.value, demoAcabado) : acabadoData.value);
+          if (useDemoData && acabadoData.value.length === 0) demoAcabado.forEach((item) => acabadoService.crear(item).catch(() => {}));
         }
         if (contactosData.status === 'fulfilled') {
-          setContactos(mergeDemo(contactosData.value, demoContactos));
-          if (contactosData.value.length === 0) demoContactos.forEach((item) => contactosService.crear(item).catch(() => {}));
+          setContactos(useDemoData ? mergeDemo(contactosData.value, demoContactos) : contactosData.value);
+          if (useDemoData && contactosData.value.length === 0) demoContactos.forEach((item) => contactosService.crear(item).catch(() => {}));
         }
         if (cotizacionesData.status === 'fulfilled') {
-          setCotizaciones(mergeDemo(cotizacionesData.value, demoCotizaciones));
-          if (cotizacionesData.value.length === 0) demoCotizaciones.forEach((item) => cotizacionesService.crear(item).catch(() => {}));
+          setCotizaciones(useDemoData ? mergeDemo(cotizacionesData.value, demoCotizaciones) : cotizacionesData.value);
+          if (useDemoData && cotizacionesData.value.length === 0) demoCotizaciones.forEach((item) => cotizacionesService.crear(item).catch(() => {}));
         }
         if (seguimientosData.status === 'fulfilled') {
-          setSeguimientos(mergeDemo(seguimientosData.value, demoSeguimientos));
-          if (seguimientosData.value.length === 0) demoSeguimientos.forEach((item) => seguimientosService.crear(item).catch(() => {}));
+          setSeguimientos(useDemoData ? mergeDemo(seguimientosData.value, demoSeguimientos) : seguimientosData.value);
+          if (useDemoData && seguimientosData.value.length === 0) demoSeguimientos.forEach((item) => seguimientosService.crear(item).catch(() => {}));
         }
 
         console.log('✅ Datos cargados desde el API');

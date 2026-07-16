@@ -163,6 +163,14 @@ app.get('/api/auditoria/integridad', verifyToken, requireAdmin, async (req, res)
     res.status(500).json({ error: error.message });
   }
 });
+app.post('/api/admin/reset-data', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    await dbModule.resetOperationalData(req);
+    res.json({ ok: true, message: 'Datos operativos reiniciados' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Fallback para React Router - servir index.html para rutas no API
 app.use((req, res, next) => {

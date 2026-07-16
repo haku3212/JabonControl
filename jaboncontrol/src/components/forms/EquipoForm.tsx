@@ -119,7 +119,7 @@ export function EquipoForm({ onSave, onCancel, initialData }: EquipoFormProps) {
         id: initialData?.id || Date.now().toString(),
       });
     } catch (error) {
-      alert('Error al guardar el equipo');
+      alert(error instanceof Error ? error.message : 'Error al guardar el equipo');
       console.error(error);
     } finally {
       // Siempre apagamos loading al terminar.

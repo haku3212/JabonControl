@@ -31,6 +31,7 @@ export function Auditoria() {
   const [userFilter, setUserFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [error, setError] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const load = async (silent = false) => {
     try {
@@ -83,6 +84,23 @@ export function Auditoria() {
     URL.revokeObjectURL(url);
   };
 
+  const resetData = async () => {
+    if (!confirm('Esto eliminara ventas, cobros, clientes, produccion, finanzas, proyectos, documentos, equipos y contactos. Los usuarios se conservan. Desea continuar?')) {
+      return;
+    }
+
+    try {
+      setResetting(true);
+      await auditoriaService.reiniciarDatos();
+      alert('Datos reiniciados correctamente.');
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message || 'No se pudo reiniciar la informacion');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
@@ -91,6 +109,13 @@ export function Auditoria() {
           <p className="text-sm text-text-tertiary">Historial visible solo para administradores. Se actualiza cada 5 segundos.</p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={resetData}
+            disabled={resetting}
+            className="px-3 py-2 bg-status-danger text-white rounded text-sm font-semibold hover:bg-opacity-90 disabled:opacity-60"
+          >
+            {resetting ? 'Reiniciando...' : 'Reiniciar datos'}
+          </button>
           <button
             onClick={exportCsv}
             className="px-3 py-2 bg-accent-yellow text-black rounded text-sm font-semibold hover:bg-opacity-90"

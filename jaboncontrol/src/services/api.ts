@@ -173,6 +173,9 @@ export const auditoriaService = {
   async listar() {
     return apiClient.get('/auditoria');
   },
+  async reiniciarDatos() {
+    return apiClient.post('/admin/reset-data', {});
+  },
 };
 
 export const finanzasService = {

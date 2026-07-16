@@ -535,6 +535,25 @@ async function logAudit(req, accion, tabla, registroId, anteriores, nuevos, deta
   await saveDB();
 }
 
+async function resetOperationalData(req) {
+  const tables = [
+    'app_records',
+    'movimientos_financieros',
+    'cobros',
+    'ventas',
+    'clientes',
+    'hornadas',
+    'recepciones',
+  ];
+
+  for (const table of tables) {
+    await run(`DELETE FROM ${table}`);
+  }
+
+  await saveDB();
+  await logAudit(req, 'reset', 'sistema', 'operacional', null, { tablas: tables }, 'Datos operativos reiniciados');
+}
+
 async function initDB() {
   await initStorage();
   await createTables();
@@ -553,4 +572,5 @@ module.exports.get = get;
 module.exports.run = run;
 module.exports.save = saveDB;
 module.exports.logAudit = logAudit;
+module.exports.resetOperationalData = resetOperationalData;
 module.exports.isPostgres = () => usePostgres;
