@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: jaboncontrol
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ENABLE_DEMO_DATA
+        value: false
+      - key: AUTH_COOKIE_ONLY
+        value: true
+      - key: JWT_EXPIRE
+        value: 7d
+      - key: PASSWORD_MAX_DAYS
+        value: 180

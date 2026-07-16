@@ -9,7 +9,7 @@
     "dev": "cd backend && npm ci && node server.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "keywords": [],
   "author": "",
