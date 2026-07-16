@@ -438,7 +438,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (materiasData.status === 'fulfilled') setRecepciones(materiasData.value);
         if (proyectosData.status === 'fulfilled') {
           setProyectos(mergeDemo(proyectosData.value, demoProyectos));
-          if (proyectosData.value.length === 0) demoProyectos.forEach((item) => proyectosService.crear(item).catch(() => {}));
+          const savedProjectIds = new Set(proyectosData.value.map((item: Proyecto) => item.id));
+          demoProyectos
+            .filter((item) => !savedProjectIds.has(item.id))
+            .forEach((item) => proyectosService.crear(item).catch(() => {}));
         }
         if (documentosData.status === 'fulfilled') {
           setDocumentos(mergeDemo(documentosData.value, demoDocumentos));
@@ -673,8 +676,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProyectos(proyectos.map((p) => (p.id === id ? { ...p, ...data, id } : p)));
     try {
       await proyectosService.actualizar(id, { ...data, id });
-    } catch (error) {
+    } catch (error: any) {
       console.log('Error al actualizar proyecto en API:', error);
+      if (String(error?.message || '').includes('Registro no encontrado')) {
+        try {
+          await proyectosService.crear({ ...data, id });
+          return;
+        } catch (createError) {
+          console.log('Error al crear proyecto faltante en API:', createError);
+        }
+      }
       if (previous) setProyectos(proyectos.map((p) => (p.id === id ? previous : p)));
     }
   };
@@ -750,8 +761,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProyectos(proyectos.filter((p) => p.id !== id));
     try {
       await proyectosService.eliminar(id);
-    } catch (error) {
+    } catch (error: any) {
       console.log('Error al eliminar proyecto en API:', error);
+      if (String(error?.message || '').includes('Registro no encontrado')) {
+        return;
+      }
       setProyectos(previous);
     }
   };
