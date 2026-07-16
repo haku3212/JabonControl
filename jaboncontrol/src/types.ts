@@ -146,3 +146,19 @@ export interface EquipoApp {
   especificaciones?: string;
   documentos?: EquipoDocumento[];
 }
+
+export interface ContactoEmpresa {
+  id: string;
+  nombre: string;
+  empresa: string;
+  categoria: string;
+  proveedorDe: string;
+  telefono: string;
+  email?: string;
+  ubicacion: string;
+  direccion: string;
+  personaContacto?: string;
+  notas: string;
+  estado: 'activo' | 'inactivo';
+  fechaRegistro: string;
+}

@@ -99,6 +99,7 @@ app.use('/api/proyectos', verifyToken, createAppRecordsRouter('proyectos'));
 app.use('/api/documentos', verifyToken, createAppRecordsRouter('documentos'));
 app.use('/api/equipos', verifyToken, createAppRecordsRouter('equipos'));
 app.use('/api/acabado', verifyToken, createAppRecordsRouter('acabado'));
+app.use('/api/contactos', verifyToken, createAppRecordsRouter('contactos'));
 app.use('/api/usuarios', verifyToken, requireAdmin, usuariosRoutes);
 app.get('/api/auditoria', verifyToken, requireAdmin, async (req, res) => {
   try {

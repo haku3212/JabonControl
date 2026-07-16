@@ -10,6 +10,7 @@ import {
   DocumentoApp,
   EquipoApp,
   RegistroAcabado,
+  ContactoEmpresa,
 } from '../types';
 import {
   ventasService,
@@ -21,6 +22,7 @@ import {
   documentosService,
   equiposService,
   acabadoService,
+  contactosService,
 } from '../services/api';
 import { calculateFinishedInventory, unitsForSale } from '../utils/inventory';
 
@@ -36,6 +38,7 @@ interface AppContextType {
   documentos: DocumentoApp[];
   equipos: EquipoApp[];
   acabado: RegistroAcabado[];
+  contactos: ContactoEmpresa[];
 
   // Actions
   addRecepcion: (data: Recepcion) => void;
@@ -47,11 +50,13 @@ interface AppContextType {
   addDocumento: (data: DocumentoApp) => void;
   addEquipo: (data: EquipoApp) => void;
   addAcabado: (data: RegistroAcabado) => void;
+  addContacto: (data: ContactoEmpresa) => void;
   updateCliente: (id: string, data: Cliente) => void;
   updateProyecto: (id: string, data: Proyecto) => void;
   updateDocumento: (id: string, data: DocumentoApp) => void;
   updateEquipo: (id: string, data: EquipoApp) => void;
   updateAcabado: (id: string, data: RegistroAcabado) => void;
+  updateContacto: (id: string, data: ContactoEmpresa) => void;
 
   deleteRecepcion: (id: string) => void;
   deleteHornada: (id: string) => void;
@@ -60,6 +65,7 @@ interface AppContextType {
   deleteDocumento: (id: string) => void;
   deleteEquipo: (id: string) => void;
   deleteAcabado: (id: string) => void;
+  deleteContacto: (id: string) => void;
 
   // Stats
   kpis: {
@@ -325,6 +331,15 @@ const demoAcabado: RegistroAcabado[] = [
   { id: 'demo-aca-6', fecha: '2026-07-03', area: 'sellado', operarios: 'Pedro G., Rosa V.', piezas: 1040, bandejas: 21, kilos: 416, observaciones: 'Sin novedades' },
 ];
 
+const demoContactos: ContactoEmpresa[] = [
+  { id: 'demo-con-1', nombre: 'Resinas del Oriente', empresa: 'Resinas del Oriente SRL', categoria: 'Insumos tecnicos', proveedorDe: 'Resina cationica para ablandador de agua', telefono: '+591 72110001', email: 'ventas@resinasoriente.bo', ubicacion: 'Santa Cruz', direccion: 'Parque industrial, modulo 4', personaContacto: 'Marco Alvarez', notas: 'Consultar disponibilidad por bolsa de 25 L.', estado: 'activo', fechaRegistro: '2026-07-15' },
+  { id: 'demo-con-2', nombre: 'Calderos Bolivia', empresa: 'Calderos Bolivia', categoria: 'Repuestos', proveedorDe: 'Valvulas, manometros y quemadores para calderos', telefono: '+591 72110002', email: 'servicio@calderosbo.com', ubicacion: 'Cochabamba', direccion: 'Av. Blanco Galindo km 6', personaContacto: 'Ing. Patricia Rojas', notas: 'Atiende emergencias con tecnico externo.', estado: 'activo', fechaRegistro: '2026-07-15' },
+  { id: 'demo-con-3', nombre: 'Quimicos Norte', empresa: 'Quimicos Norte', categoria: 'Materia prima', proveedorDe: 'Soda caustica, indicadores y reactivos', telefono: '+591 72110003', email: 'pedidos@quimicosnorte.bo', ubicacion: 'La Paz', direccion: 'Zona Villa Fatima, calle 8', personaContacto: 'Daniel Paredes', notas: 'Pedir ficha tecnica actualizada.', estado: 'activo', fechaRegistro: '2026-07-15' },
+  { id: 'demo-con-4', nombre: 'Tecnico Calderista Luis', empresa: 'Servicio independiente', categoria: 'Servicio tecnico', proveedorDe: 'Mantenimiento preventivo de calderos', telefono: '+591 72110004', email: '', ubicacion: 'Santa Cruz', direccion: 'Atencion a domicilio', personaContacto: 'Luis Vargas', notas: 'Disponible fines de semana con recargo.', estado: 'activo', fechaRegistro: '2026-07-15' },
+  { id: 'demo-con-5', nombre: 'Empaques Amazonas', empresa: 'Empaques Amazonas', categoria: 'Empaque', proveedorDe: 'Cajas, bolsas y etiquetas', telefono: '+591 72110005', email: 'comercial@empaquesamazonas.bo', ubicacion: 'Trinidad', direccion: 'Zona mercado industrial', personaContacto: 'Ruth Cabrera', notas: 'Maneja cajas personalizadas por millar.', estado: 'activo', fechaRegistro: '2026-07-15' },
+  { id: 'demo-con-6', nombre: 'Transporte Beni', empresa: 'Transportes Beni', categoria: 'Logistica', proveedorDe: 'Transporte de insumos y producto terminado', telefono: '+591 72110006', email: '', ubicacion: 'Beni', direccion: 'Terminal de carga', personaContacto: 'Oscar Menacho', notas: 'Confirmar ruta con 24 horas de anticipacion.', estado: 'inactivo', fechaRegistro: '2026-07-15' },
+];
+
 const mergeDemo = <T extends { id: string }>(saved: T[], demo: T[]) => {
   const savedIds = new Set(saved.map((item) => item.id));
   return [...saved, ...demo.filter((item) => !savedIds.has(item.id))];
@@ -341,13 +356,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [documentos, setDocumentos] = useState<DocumentoApp[]>(demoDocumentos);
   const [equipos, setEquipos] = useState<EquipoApp[]>(demoEquipos);
   const [acabado, setAcabado] = useState<RegistroAcabado[]>(demoAcabado);
+  const [contactos, setContactos] = useState<ContactoEmpresa[]>(demoContactos);
 
 
   // Cargar datos del API al montar
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const [ventasData, clientesData, hornadasData, cobrosData, materiasData, proyectosData, documentosData, equiposData, acabadoData] = await Promise.allSettled([
+        const [ventasData, clientesData, hornadasData, cobrosData, materiasData, proyectosData, documentosData, equiposData, acabadoData, contactosData] = await Promise.allSettled([
           ventasService.listar(),
           clientesService.listar(),
           hornadasService.listar(),
@@ -357,6 +373,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           documentosService.listar(),
           equiposService.listar(),
           acabadoService.listar(),
+          contactosService.listar(),
         ]);
 
         // Si la API responde exitosamente, actualizar los datos
@@ -380,6 +397,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (acabadoData.status === 'fulfilled') {
           setAcabado(mergeDemo(acabadoData.value, demoAcabado));
           if (acabadoData.value.length === 0) demoAcabado.forEach((item) => acabadoService.crear(item).catch(() => {}));
+        }
+        if (contactosData.status === 'fulfilled') {
+          setContactos(mergeDemo(contactosData.value, demoContactos));
+          if (contactosData.value.length === 0) demoContactos.forEach((item) => contactosService.crear(item).catch(() => {}));
         }
 
         console.log('✅ Datos cargados desde el API');
@@ -555,6 +576,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addContacto = async (data: ContactoEmpresa) => {
+    const nuevo = { ...data, id: data.id || Date.now().toString() };
+    setContactos([nuevo, ...contactos]);
+    try {
+      await contactosService.crear(nuevo);
+    } catch (error) {
+      console.log('Error al guardar contacto en API:', error);
+    }
+  };
+
   const updateProyecto = async (id: string, data: Proyecto) => {
     const previous = proyectos.find((p) => p.id === id);
     setProyectos(proyectos.map((p) => (p.id === id ? { ...p, ...data, id } : p)));
@@ -599,6 +630,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateContacto = async (id: string, data: ContactoEmpresa) => {
+    const previous = contactos.find((item) => item.id === id);
+    setContactos(contactos.map((item) => (item.id === id ? { ...item, ...data, id } : item)));
+    try {
+      await contactosService.actualizar(id, { ...data, id });
+    } catch (error) {
+      console.log('Error al actualizar contacto en API:', error);
+      if (previous) setContactos(contactos.map((item) => (item.id === id ? previous : item)));
+    }
+  };
+
   const deleteProyecto = async (id: string) => {
     const previous = proyectos;
     setProyectos(proyectos.filter((p) => p.id !== id));
@@ -640,6 +682,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.log('Error al eliminar acabado en API:', error);
       setAcabado(previous);
+    }
+  };
+
+  const deleteContacto = async (id: string) => {
+    const previous = contactos;
+    setContactos(contactos.filter((item) => item.id !== id));
+    try {
+      await contactosService.eliminar(id);
+    } catch (error) {
+      console.log('Error al eliminar contacto en API:', error);
+      setContactos(previous);
     }
   };
 
@@ -699,6 +752,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     documentos,
     equipos,
     acabado,
+    contactos,
     addRecepcion,
     addHornada,
     addVenta,
@@ -708,11 +762,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addDocumento,
     addEquipo,
     addAcabado,
+    addContacto,
     updateCliente,
     updateProyecto,
     updateDocumento,
     updateEquipo,
     updateAcabado,
+    updateContacto,
     deleteRecepcion,
     deleteHornada,
     deleteVenta,
@@ -720,6 +776,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteDocumento,
     deleteEquipo,
     deleteAcabado,
+    deleteContacto,
     kpis,
   };
 

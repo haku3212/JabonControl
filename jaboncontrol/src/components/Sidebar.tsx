@@ -1,5 +1,4 @@
 import { visiblePanels } from '../utils/permissions';
-import { ReactNode } from 'react';
 
 interface SidebarProps {
   user: { nombre: string; usuario: string; rol: string };
@@ -21,35 +20,36 @@ const baseSections: NavSection[] = [
   {
     label: 'Principal',
     items: [
-      { id: 'dashboard', icon: '📊', label: 'Dashboard' },
-    ]
+      { id: 'dashboard', icon: 'DASH', label: 'Dashboard' },
+    ],
   },
   {
-    label: 'Producción',
+    label: 'Produccion',
     items: [
-      { id: 'materias', icon: '🧪', label: 'Materias Primas' },
-      { id: 'hornadas', icon: '🔥', label: 'Hornadas' },
-      { id: 'acabado', icon: '📦', label: 'Acabado' },
-    ]
+      { id: 'materias', icon: 'MAT', label: 'Materias Primas' },
+      { id: 'hornadas', icon: 'HOR', label: 'Hornadas' },
+      { id: 'acabado', icon: 'ACA', label: 'Acabado' },
+    ],
   },
   {
     label: 'Comercial',
     items: [
-      { id: 'ventas', icon: '🛒', label: 'Ventas' },
-      { id: 'cobros', icon: '💰', label: 'Cobros' },
-      { id: 'clientes', icon: '👥', label: 'Clientes' },
+      { id: 'ventas', icon: 'VEN', label: 'Ventas' },
+      { id: 'cobros', icon: 'COB', label: 'Cobros' },
+      { id: 'clientes', icon: 'CLI', label: 'Clientes' },
       { id: 'finanzas', icon: 'FIN', label: 'Finanzas' },
-    ]
+    ],
   },
   {
-    label: 'Gestión',
+    label: 'Gestion',
     items: [
-      { id: 'proyectos', icon: '🏗️', label: 'Proyectos' },
-      { id: 'documentacion', icon: '📋', label: 'Documentación' },
-      { id: 'equipos', icon: '⚙️', label: 'Equipos' },
-      { id: 'reportes', icon: '📈', label: 'Reportes' },
-    ]
-  }
+      { id: 'proyectos', icon: 'PRO', label: 'Proyectos' },
+      { id: 'contactos', icon: 'DIR', label: 'Contactos' },
+      { id: 'documentacion', icon: 'DOC', label: 'Documentacion' },
+      { id: 'equipos', icon: 'EQP', label: 'Equipos' },
+      { id: 'reportes', icon: 'REP', label: 'Reportes' },
+    ],
+  },
 ];
 
 export function Sidebar({ user, activePanel, onNavigate }: SidebarProps) {
@@ -75,17 +75,15 @@ export function Sidebar({ user, activePanel, onNavigate }: SidebarProps) {
 
   return (
     <aside className="w-60 bg-dark-surface border-r border-dark-border flex flex-col h-screen overflow-y-auto">
-      {/* Logo */}
       <div className="p-5 border-b border-dark-border">
         <div className="text-2xl font-bebas font-bold text-accent-yellow tracking-wider">
           JabonControl
         </div>
         <div className="text-xs font-mono text-text-tertiary tracking-widest mt-1">
-          SISTEMA DE GESTIÓN
+          SISTEMA DE GESTION
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 py-2 space-y-0">
         {sections.map((section, idx) => (
           <div key={idx} className="py-2 border-b border-dark-border">
@@ -102,7 +100,7 @@ export function Sidebar({ user, activePanel, onNavigate }: SidebarProps) {
                     : 'text-text-secondary border-transparent hover:bg-dark-surface2 hover:text-text-primary'
                 }`}
               >
-                <span className="text-[11px] font-mono min-w-6 text-center text-accent-yellow">{item.icon}</span>
+                <span className="text-[10px] font-mono min-w-7 text-center text-accent-yellow">{item.icon}</span>
                 <span className="flex-1 text-left">{item.label}</span>
                 {item.badge && (
                   <span className="ml-auto bg-accent-orange text-white text-xs font-mono px-1.5 py-0.5 rounded">
@@ -115,7 +113,6 @@ export function Sidebar({ user, activePanel, onNavigate }: SidebarProps) {
         ))}
       </nav>
 
-      {/* User */}
       <div className="p-3 border-t border-dark-border">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-accent-yellow text-black flex items-center justify-center text-xs font-bold">

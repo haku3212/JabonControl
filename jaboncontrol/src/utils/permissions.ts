@@ -1,9 +1,9 @@
 export type UserRole = 'admin' | 'supervisor' | 'operario' | string;
 
 const roleAccess: Record<string, string[]> = {
-  admin: ['dashboard', 'materias', 'hornadas', 'acabado', 'ventas', 'cobros', 'clientes', 'finanzas', 'proyectos', 'documentacion', 'equipos', 'reportes', 'usuarios', 'auditoria'],
-  supervisor: ['dashboard', 'materias', 'hornadas', 'acabado', 'ventas', 'cobros', 'clientes', 'finanzas', 'proyectos', 'documentacion', 'equipos', 'reportes'],
-  operario: ['dashboard', 'materias', 'hornadas', 'acabado', 'ventas', 'clientes', 'documentacion', 'equipos'],
+  admin: ['dashboard', 'materias', 'hornadas', 'acabado', 'ventas', 'cobros', 'clientes', 'finanzas', 'proyectos', 'contactos', 'documentacion', 'equipos', 'reportes', 'usuarios', 'auditoria'],
+  supervisor: ['dashboard', 'materias', 'hornadas', 'acabado', 'ventas', 'cobros', 'clientes', 'finanzas', 'proyectos', 'contactos', 'documentacion', 'equipos', 'reportes'],
+  operario: ['dashboard', 'materias', 'hornadas', 'acabado', 'ventas', 'clientes', 'contactos', 'documentacion', 'equipos'],
 };
 
 const createAccess: Record<string, string[]> = {

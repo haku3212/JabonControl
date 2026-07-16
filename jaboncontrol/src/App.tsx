@@ -13,6 +13,7 @@ import { Cobros } from './components/panels/Cobros';
 import { Clientes } from './components/panels/Clientes';
 import { Finanzas } from './components/panels/Finanzas';
 import { Proyectos } from './components/panels/Proyectos';
+import { Contactos } from './components/panels/Contactos';
 import { Documentacion } from './components/panels/Documentacion';
 import { Equipos } from './components/panels/Equipos';
 import { Reportes } from './components/panels/Reportes';
@@ -41,6 +42,7 @@ const panelTitles: Record<string, [string, string]> = {
   clientes: ['Clientes', 'COMERCIAL / CLIENTES'],
   finanzas: ['Finanzas', 'FINANZAS / FLUJO DE CAJA'],
   proyectos: ['Proyectos', 'GESTIÓN / PROYECTOS'],
+  contactos: ['Contactos', 'GESTIÓN / CONTACTOS'],
   documentacion: ['Documentación', 'GESTIÓN / DOCUMENTACIÓN'],
   equipos: ['Equipos', 'GESTIÓN / EQUIPOS'],
   reportes: ['Reportes', 'GESTIÓN / REPORTES'],
@@ -218,6 +220,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     clientes: <Clientes onNewClick={() => setModalType('cliente')} />,
     finanzas: <Finanzas />,
     proyectos: <Proyectos />,
+    contactos: <Contactos />,
     documentacion: <Documentacion onNewClick={() => setModalType('documento')} />,
     equipos: <Equipos onNewClick={() => setModalType('equipo')} />,
     reportes: <Reportes />,
