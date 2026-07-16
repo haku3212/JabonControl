@@ -21,8 +21,12 @@ const crypto = require('crypto');
 
 const app = express();
 
-// Lista de origenes permitidos; en desarrollo acepta localhost y 127.0.0.1.
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://127.0.0.1:5173,http://localhost:5173')
+// Lista de origenes permitidos; en desarrollo acepta localhost y en Render acepta su URL publica.
+const allowedOrigins = (process.env.CORS_ORIGIN || [
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
+  process.env.RENDER_EXTERNAL_URL,
+].filter(Boolean).join(','))
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -32,6 +36,15 @@ function isLocalDevelopmentOrigin(origin) {
   try {
     const url = new URL(origin);
     return ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isRenderOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return process.env.NODE_ENV === 'production' && url.protocol === 'https:' && url.hostname.endsWith('.onrender.com');
   } catch {
     return false;
   }
@@ -69,6 +82,9 @@ app.use(cors({
 
     // En desarrollo acepta Vite aunque cambie de puerto.
     if (isLocalDevelopmentOrigin(origin)) return callback(null, true);
+
+    // En Render acepta el dominio publico del servicio aunque CORS_ORIGIN no se haya configurado todavia.
+    if (isRenderOrigin(origin)) return callback(null, true);
 
     // Rechaza origenes externos no esperados.
     return callback(new Error('Origen no permitido por CORS'));
