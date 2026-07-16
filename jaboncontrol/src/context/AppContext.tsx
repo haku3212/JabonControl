@@ -399,7 +399,7 @@ const mergeDemo = <T extends { id: string }>(saved: T[], demo: T[]) => {
 };
 
 const env = import.meta.env as ImportMetaEnv & Record<string, string | undefined>;
-const useDemoData = import.meta.env.DEV || env.VITE_ENABLE_DEMO_DATA === 'true';
+const useDemoData = env.VITE_ENABLE_DEMO_DATA === 'true';
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [recepciones, setRecepciones] = useState<Recepcion[]>(useDemoData ? initialRecepcion : []);

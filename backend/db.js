@@ -550,6 +550,7 @@ async function resetOperationalData(req) {
     await run(`DELETE FROM ${table}`);
   }
 
+  await run('DELETE FROM audit_logs');
   await saveDB();
   await logAudit(req, 'reset', 'sistema', 'operacional', null, { tablas: tables }, 'Datos operativos reiniciados');
 }
