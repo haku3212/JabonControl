@@ -29,7 +29,7 @@ export function Login({ onLogin }: LoginProps) {
         setError('Respuesta inválida del servidor');
       }
     } catch (err: any) {
-      if (err.message?.includes('401')) {
+      if (err.message?.toLowerCase().includes('incorrect')) {
         setError('Usuario o contraseña incorrectos');
       } else {
         setError('No se pudo conectar al servidor. Intente de nuevo.');

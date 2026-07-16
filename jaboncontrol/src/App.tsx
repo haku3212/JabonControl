@@ -355,6 +355,44 @@ export function App() {
       return null;
     }
   });
+  const [checkingSession, setCheckingSession] = useState(Boolean(user));
+
+  useEffect(() => {
+    let active = true;
+
+    const clearSession = () => {
+      localStorage.removeItem('jc_user');
+      setUser(null);
+      setCheckingSession(false);
+    };
+
+    window.addEventListener('jc:auth-expired', clearSession);
+
+    if (!user) {
+      setCheckingSession(false);
+      return () => window.removeEventListener('jc:auth-expired', clearSession);
+    }
+
+    authService.verificar()
+      .then((response) => {
+        if (!active) return;
+        if (response.user) {
+          localStorage.setItem('jc_user', JSON.stringify(response.user));
+          setUser(response.user);
+        }
+      })
+      .catch(() => {
+        if (active) clearSession();
+      })
+      .finally(() => {
+        if (active) setCheckingSession(false);
+      });
+
+    return () => {
+      active = false;
+      window.removeEventListener('jc:auth-expired', clearSession);
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -365,6 +403,14 @@ export function App() {
     localStorage.removeItem('jc_user');
     setUser(null);
   };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-dark-bg flex items-center justify-center text-text-secondary text-sm">
+        Verificando sesion...
+      </div>
+    );
+  }
 
   if (!user) {
     return <Login onLogin={setUser} />;

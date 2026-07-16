@@ -8,9 +8,14 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || (
   import.meta.env.DEV ? getDevApiUrl() : 'https://jaboncontrol-production.up.railway.app/api'
 );
 
-async function parseResponse(response: Response) {
+async function parseResponse(response: Response, endpoint: string) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401 && endpoint !== '/auth/login') {
+      localStorage.removeItem('jc_user');
+      window.dispatchEvent(new Event('jc:auth-expired'));
+      throw new Error('Sesion expirada. Inicie sesion nuevamente.');
+    }
     throw new Error(data.error || `Error: ${response.status}`);
   }
   return data;
@@ -28,22 +33,22 @@ const requestOptions = (method: string, data?: any): RequestInit => ({
 export const apiClient = {
   async get(endpoint: string) {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('GET'));
-    return parseResponse(response);
+    return parseResponse(response, endpoint);
   },
 
   async post(endpoint: string, data: any) {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('POST', data));
-    return parseResponse(response);
+    return parseResponse(response, endpoint);
   },
 
   async put(endpoint: string, data: any) {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('PUT', data));
-    return parseResponse(response);
+    return parseResponse(response, endpoint);
   },
 
   async delete(endpoint: string) {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('DELETE'));
-    return parseResponse(response);
+    return parseResponse(response, endpoint);
   },
 };
 
