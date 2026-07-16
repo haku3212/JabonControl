@@ -38,6 +38,13 @@ const emptyForm: MovimientoFinanciero = {
 
 const money = (value: number) => `Bs ${Math.round(value).toLocaleString('es-BO')}`;
 
+const origenLabel = (origen = 'manual') => {
+  if (origen === 'sistema-cobro') return 'Cobros';
+  if (origen === 'sistema-compra') return 'Compras';
+  if (origen === 'csv' || origen === 'excel') return 'CSV';
+  return 'Manual';
+};
+
 const normalizeKey = (key: string) => key.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '');
 
 const getCell = (row: Record<string, any>, names: string[]) => {
@@ -120,7 +127,7 @@ const classifyRow = (row: Record<string, any>): MovimientoFinanciero => {
 };
 
 export function Finanzas() {
-  const { ventas, cobros } = useAppContext();
+  const { ventas, cobros, recepciones } = useAppContext();
   const [movimientos, setMovimientos] = useState<MovimientoFinanciero[]>([]);
   const [form, setForm] = useState<MovimientoFinanciero>(emptyForm);
   const [preview, setPreview] = useState<MovimientoFinanciero[]>([]);
@@ -145,13 +152,66 @@ export function Finanzas() {
     load();
   }, []);
 
+  const movimientosSistema = useMemo<MovimientoFinanciero[]>(() => {
+    const ingresosCobros = cobros.map((cobro) => ({
+      id: `sistema-cobro-${cobro.id}`,
+      fecha: cobro.fecha,
+      tipo: 'ingreso' as const,
+      categoria: 'Cobros',
+      concepto: `Cobro ${cobro.notasCorrespondientes || ''}`.trim(),
+      tercero: cobro.cliente,
+      metodoPago: cobro.metodoPago,
+      referencia: cobro.notasCorrespondientes || cobro.id,
+      monto: cobro.montoCobrado,
+      origen: 'sistema-cobro',
+      notas: 'Generado automaticamente desde el modulo Cobros',
+    }));
+
+    const egresosCompras = recepciones
+      .filter((recepcion) => recepcion.estado !== 'cancelado')
+      .map((recepcion) => ({
+        id: `sistema-recepcion-${recepcion.id}`,
+        fecha: recepcion.fecha,
+        tipo: 'egreso' as const,
+        categoria: 'Materia prima',
+        concepto: `Compra ${recepcion.producto}`,
+        tercero: recepcion.proveedor,
+        metodoPago: '',
+        referencia: recepcion.id,
+        monto: Number(recepcion.precioTotal || 0),
+        origen: 'sistema-compra',
+        notas: 'Generado automaticamente desde Materias Primas',
+      }));
+
+    return [...ingresosCobros, ...egresosCompras];
+  }, [cobros, recepciones]);
+
+  const isDuplicadoOperativo = (movimiento: MovimientoFinanciero) => {
+    const categoria = normalizeKey(movimiento.categoria || '');
+    const concepto = normalizeKey(movimiento.concepto || '');
+    return (
+      categoria.includes('cobro') ||
+      categoria.includes('venta') ||
+      categoria.includes('materiaprima') ||
+      concepto.includes('cobrone') ||
+      concepto.includes('compranaoh')
+    );
+  };
+
+  const movimientosAjuste = useMemo(
+    () => movimientos.filter((movimiento) => !isDuplicadoOperativo(movimiento)),
+    [movimientos]
+  );
+
   const resumen = useMemo(() => {
     const ingresosVentas = ventas.reduce((sum, venta) => sum + (venta.total || venta.precioTotal || 0), 0);
     const cobrado = cobros.reduce((sum, cobro) => sum + cobro.montoCobrado, 0);
     const porCobrar = ventas.reduce((sum, venta) => sum + ventaSaldoPendiente(venta), 0);
-    const ingresosExtra = movimientos.filter((m) => m.tipo === 'ingreso').reduce((sum, item) => sum + Number(item.monto || 0), 0);
-    const egresos = movimientos.filter((m) => m.tipo === 'egreso').reduce((sum, item) => sum + Number(item.monto || 0), 0);
+    const ingresosExtra = movimientosAjuste.filter((m) => m.tipo === 'ingreso').reduce((sum, item) => sum + Number(item.monto || 0), 0);
+    const egresosExtra = movimientosAjuste.filter((m) => m.tipo === 'egreso').reduce((sum, item) => sum + Number(item.monto || 0), 0);
+    const comprasSistema = recepciones.filter((item) => item.estado !== 'cancelado').reduce((sum, item) => sum + Number(item.precioTotal || 0), 0);
     const ingresosTotales = ingresosVentas + ingresosExtra;
+    const egresos = comprasSistema + egresosExtra;
 
     return {
       ingresosTotales,
@@ -161,9 +221,13 @@ export function Finanzas() {
       utilidad: ingresosTotales - egresos,
       flujoCaja: cobrado + ingresosExtra - egresos,
     };
-  }, [ventas, cobros, movimientos]);
+  }, [ventas, cobros, recepciones, movimientosAjuste]);
 
-  const filteredMovimientos = filter === 'todos' ? movimientos : movimientos.filter((item) => item.tipo === filter);
+  const libroFinanciero = useMemo(
+    () => [...movimientosSistema, ...movimientos].sort((a, b) => `${b.fecha}${b.id || ''}`.localeCompare(`${a.fecha}${a.id || ''}`)),
+    [movimientosSistema, movimientos]
+  );
+  const filteredMovimientos = filter === 'todos' ? libroFinanciero : libroFinanciero.filter((item) => item.tipo === filter);
 
   const saveManual = async () => {
     if (!form.concepto.trim() || Number(form.monto) <= 0) {
@@ -316,7 +380,7 @@ export function Finanzas() {
         </Card>
       )}
 
-      <Card title="Movimientos financieros" badge={{ label: `${filteredMovimientos.length} registros`, type: 'info' }}>
+      <Card title="Libro financiero conectado" badge={{ label: `${filteredMovimientos.length} registros`, type: 'info' }}>
         <div className="mb-4 flex gap-2">
           {['todos', 'ingreso', 'egreso'].map((item) => (
             <button
@@ -328,6 +392,9 @@ export function Finanzas() {
             </button>
           ))}
         </div>
+        <p className="mb-4 text-xs text-text-tertiary">
+          Cobros y compras se generan automaticamente desde sus modulos. Los registros manuales/importados sirven para gastos extra, banco y ajustes.
+        </p>
         {loading ? <div className="py-8 text-center text-text-tertiary text-sm">Cargando movimientos...</div> : <MovimientosTable data={filteredMovimientos} onDelete={remove} />}
       </Card>
       <ReportDownloadModal
@@ -347,7 +414,7 @@ function MovimientosTable({ data, preview = false, onDelete }: { data: Movimient
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-dark-border">
-            {['Fecha', 'Tipo', 'Categoria', 'Concepto', 'Tercero', 'Referencia', 'Monto', ''].map((head) => (
+            {['Fecha', 'Tipo', 'Categoria', 'Concepto', 'Tercero', 'Referencia', 'Origen', 'Monto', ''].map((head) => (
               <th key={head} className="text-left px-3 py-2 text-xs font-mono text-text-tertiary uppercase">{head}</th>
             ))}
           </tr>
@@ -361,9 +428,12 @@ function MovimientosTable({ data, preview = false, onDelete }: { data: Movimient
               <td className="px-3 py-2 text-text-primary">{item.concepto}</td>
               <td className="px-3 py-2 text-text-secondary">{item.tercero || '-'}</td>
               <td className="px-3 py-2 font-mono text-text-tertiary">{item.referencia || '-'}</td>
+              <td className="px-3 py-2">
+                <Badge label={origenLabel(item.origen)} type={item.origen?.startsWith('sistema') ? 'info' : 'neutral'} />
+              </td>
               <td className={`px-3 py-2 font-mono font-semibold ${item.tipo === 'ingreso' ? 'text-status-success' : 'text-status-danger'}`}>{money(Number(item.monto || 0))}</td>
               <td className="px-3 py-2 text-right">
-                {!preview && onDelete && <button onClick={() => onDelete(item)} className="text-status-danger text-xs hover:underline">Eliminar</button>}
+                {!preview && onDelete && !item.origen?.startsWith('sistema') && <button onClick={() => onDelete(item)} className="text-status-danger text-xs hover:underline">Eliminar</button>}
               </td>
             </tr>
           ))}
