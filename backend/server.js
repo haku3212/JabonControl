@@ -95,6 +95,8 @@ app.use('/api/clientes', verifyToken, requireRoles('admin', 'supervisor', 'super
 app.use('/api/hornadas', verifyToken, requireRoles('admin', 'operario'), hornadasRoutes);
 app.use('/api/materias', verifyToken, requireRoles('admin', 'operario'), materiasRoutes);
 app.use('/api/finanzas', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), finanzasRoutes);
+app.use('/api/cotizaciones', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), createAppRecordsRouter('cotizaciones'));
+app.use('/api/seguimientos', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas'), createAppRecordsRouter('seguimientos'));
 app.use('/api/proyectos', verifyToken, requireRoles('admin'), createAppRecordsRouter('proyectos'));
 app.use('/api/documentos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('documentos'));
 app.use('/api/equipos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('equipos'));

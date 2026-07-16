@@ -11,6 +11,8 @@ import {
   EquipoApp,
   RegistroAcabado,
   ContactoEmpresa,
+  Cotizacion,
+  SeguimientoComercial,
 } from '../types';
 import {
   ventasService,
@@ -23,6 +25,8 @@ import {
   equiposService,
   acabadoService,
   contactosService,
+  cotizacionesService,
+  seguimientosService,
 } from '../services/api';
 import { calculateFinishedInventory, unitsForSale } from '../utils/inventory';
 
@@ -39,6 +43,8 @@ interface AppContextType {
   equipos: EquipoApp[];
   acabado: RegistroAcabado[];
   contactos: ContactoEmpresa[];
+  cotizaciones: Cotizacion[];
+  seguimientos: SeguimientoComercial[];
 
   // Actions
   addRecepcion: (data: Recepcion) => void;
@@ -51,12 +57,16 @@ interface AppContextType {
   addEquipo: (data: EquipoApp) => void;
   addAcabado: (data: RegistroAcabado) => void;
   addContacto: (data: ContactoEmpresa) => void;
+  addCotizacion: (data: Cotizacion) => void;
+  addSeguimiento: (data: SeguimientoComercial) => void;
   updateCliente: (id: string, data: Cliente) => void;
   updateProyecto: (id: string, data: Proyecto) => void;
   updateDocumento: (id: string, data: DocumentoApp) => void;
   updateEquipo: (id: string, data: EquipoApp) => void;
   updateAcabado: (id: string, data: RegistroAcabado) => void;
   updateContacto: (id: string, data: ContactoEmpresa) => void;
+  updateCotizacion: (id: string, data: Cotizacion) => void;
+  updateSeguimiento: (id: string, data: SeguimientoComercial) => void;
 
   deleteRecepcion: (id: string) => void;
   deleteHornada: (id: string) => void;
@@ -66,6 +76,8 @@ interface AppContextType {
   deleteEquipo: (id: string) => void;
   deleteAcabado: (id: string) => void;
   deleteContacto: (id: string) => void;
+  deleteCotizacion: (id: string) => void;
+  deleteSeguimiento: (id: string) => void;
 
   // Stats
   kpis: {
@@ -340,6 +352,44 @@ const demoContactos: ContactoEmpresa[] = [
   { id: 'demo-con-6', nombre: 'Transporte Beni', empresa: 'Transportes Beni', categoria: 'Logistica', proveedorDe: 'Transporte de insumos y producto terminado', telefono: '+591 72110006', email: '', ubicacion: 'Beni', direccion: 'Terminal de carga', personaContacto: 'Oscar Menacho', notas: 'Confirmar ruta con 24 horas de anticipacion.', estado: 'inactivo', fechaRegistro: '2026-07-15' },
 ];
 
+const demoCotizaciones: Cotizacion[] = [
+  {
+    id: 'demo-cot-1',
+    numero: 'COT-2026-001',
+    fecha: '2026-07-10',
+    cliente: 'Supermercado El Sol',
+    estado: 'enviada',
+    validezDias: 15,
+    responsable: 'Ventas',
+    notas: 'Cotizacion para reposicion mensual.',
+    items: [
+      { id: 'cot-1-i1', descripcion: 'Jabon en caja x50 pastas', cantidad: 40, precioUnitario: 95 },
+      { id: 'cot-1-i2', descripcion: 'Jabon por unidad', cantidad: 120, precioUnitario: 2 },
+    ],
+    total: 4040,
+  },
+  {
+    id: 'demo-cot-2',
+    numero: 'COT-2026-002',
+    fecha: '2026-07-12',
+    cliente: 'Distribuidora Litoral',
+    estado: 'aceptada',
+    validezDias: 10,
+    responsable: 'Administracion',
+    notas: 'Pedido aprobado para entrega parcial.',
+    items: [
+      { id: 'cot-2-i1', descripcion: 'Jabon industrial caja x50', cantidad: 80, precioUnitario: 90 },
+    ],
+    total: 7200,
+  },
+];
+
+const demoSeguimientos: SeguimientoComercial[] = [
+  { id: 'demo-seg-1', cliente: 'Supermercado El Sol', tipo: 'cobro', asunto: 'Confirmar pago parcial pendiente', fecha: '2026-07-18', responsable: 'Ventas', estado: 'pendiente', prioridad: 'alta', notas: 'Tiene saldo pendiente, llamar antes del mediodia.' },
+  { id: 'demo-seg-2', cliente: 'Distribuidora Litoral', tipo: 'llamada', asunto: 'Validar recompra de agosto', fecha: '2026-07-20', responsable: 'Administracion', estado: 'en_proceso', prioridad: 'media', notas: 'Cliente frecuente, preguntar volumen estimado.' },
+  { id: 'demo-seg-3', cliente: 'Supermercado El Sol', tipo: 'cotizacion', asunto: 'Dar seguimiento a COT-2026-001', fecha: '2026-07-17', responsable: 'Ventas', estado: 'pendiente', prioridad: 'media', notas: 'Esperar respuesta del area de compras.' },
+];
+
 const mergeDemo = <T extends { id: string }>(saved: T[], demo: T[]) => {
   const savedIds = new Set(saved.map((item) => item.id));
   return [...saved, ...demo.filter((item) => !savedIds.has(item.id))];
@@ -357,13 +407,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [equipos, setEquipos] = useState<EquipoApp[]>(demoEquipos);
   const [acabado, setAcabado] = useState<RegistroAcabado[]>(demoAcabado);
   const [contactos, setContactos] = useState<ContactoEmpresa[]>(demoContactos);
+  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(demoCotizaciones);
+  const [seguimientos, setSeguimientos] = useState<SeguimientoComercial[]>(demoSeguimientos);
 
 
   // Cargar datos del API al montar
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const [ventasData, clientesData, hornadasData, cobrosData, materiasData, proyectosData, documentosData, equiposData, acabadoData, contactosData] = await Promise.allSettled([
+        const [ventasData, clientesData, hornadasData, cobrosData, materiasData, proyectosData, documentosData, equiposData, acabadoData, contactosData, cotizacionesData, seguimientosData] = await Promise.allSettled([
           ventasService.listar(),
           clientesService.listar(),
           hornadasService.listar(),
@@ -374,6 +426,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           equiposService.listar(),
           acabadoService.listar(),
           contactosService.listar(),
+          cotizacionesService.listar(),
+          seguimientosService.listar(),
         ]);
 
         // Si la API responde exitosamente, actualizar los datos
@@ -401,6 +455,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (contactosData.status === 'fulfilled') {
           setContactos(mergeDemo(contactosData.value, demoContactos));
           if (contactosData.value.length === 0) demoContactos.forEach((item) => contactosService.crear(item).catch(() => {}));
+        }
+        if (cotizacionesData.status === 'fulfilled') {
+          setCotizaciones(mergeDemo(cotizacionesData.value, demoCotizaciones));
+          if (cotizacionesData.value.length === 0) demoCotizaciones.forEach((item) => cotizacionesService.crear(item).catch(() => {}));
+        }
+        if (seguimientosData.status === 'fulfilled') {
+          setSeguimientos(mergeDemo(seguimientosData.value, demoSeguimientos));
+          if (seguimientosData.value.length === 0) demoSeguimientos.forEach((item) => seguimientosService.crear(item).catch(() => {}));
         }
 
         console.log('✅ Datos cargados desde el API');
@@ -586,6 +648,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addCotizacion = async (data: Cotizacion) => {
+    const nuevo = { ...data, id: data.id || Date.now().toString() };
+    setCotizaciones([nuevo, ...cotizaciones]);
+    try {
+      await cotizacionesService.crear(nuevo);
+    } catch (error) {
+      console.log('Error al guardar cotizacion en API:', error);
+    }
+  };
+
+  const addSeguimiento = async (data: SeguimientoComercial) => {
+    const nuevo = { ...data, id: data.id || Date.now().toString() };
+    setSeguimientos([nuevo, ...seguimientos]);
+    try {
+      await seguimientosService.crear(nuevo);
+    } catch (error) {
+      console.log('Error al guardar seguimiento en API:', error);
+    }
+  };
+
   const updateProyecto = async (id: string, data: Proyecto) => {
     const previous = proyectos.find((p) => p.id === id);
     setProyectos(proyectos.map((p) => (p.id === id ? { ...p, ...data, id } : p)));
@@ -641,6 +723,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateCotizacion = async (id: string, data: Cotizacion) => {
+    const previous = cotizaciones.find((item) => item.id === id);
+    setCotizaciones(cotizaciones.map((item) => (item.id === id ? { ...item, ...data, id } : item)));
+    try {
+      await cotizacionesService.actualizar(id, { ...data, id });
+    } catch (error) {
+      console.log('Error al actualizar cotizacion en API:', error);
+      if (previous) setCotizaciones(cotizaciones.map((item) => (item.id === id ? previous : item)));
+    }
+  };
+
+  const updateSeguimiento = async (id: string, data: SeguimientoComercial) => {
+    const previous = seguimientos.find((item) => item.id === id);
+    setSeguimientos(seguimientos.map((item) => (item.id === id ? { ...item, ...data, id } : item)));
+    try {
+      await seguimientosService.actualizar(id, { ...data, id });
+    } catch (error) {
+      console.log('Error al actualizar seguimiento en API:', error);
+      if (previous) setSeguimientos(seguimientos.map((item) => (item.id === id ? previous : item)));
+    }
+  };
+
   const deleteProyecto = async (id: string) => {
     const previous = proyectos;
     setProyectos(proyectos.filter((p) => p.id !== id));
@@ -693,6 +797,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.log('Error al eliminar contacto en API:', error);
       setContactos(previous);
+    }
+  };
+
+  const deleteCotizacion = async (id: string) => {
+    const previous = cotizaciones;
+    setCotizaciones(cotizaciones.filter((item) => item.id !== id));
+    try {
+      await cotizacionesService.eliminar(id);
+    } catch (error) {
+      console.log('Error al eliminar cotizacion en API:', error);
+      setCotizaciones(previous);
+    }
+  };
+
+  const deleteSeguimiento = async (id: string) => {
+    const previous = seguimientos;
+    setSeguimientos(seguimientos.filter((item) => item.id !== id));
+    try {
+      await seguimientosService.eliminar(id);
+    } catch (error) {
+      console.log('Error al eliminar seguimiento en API:', error);
+      setSeguimientos(previous);
     }
   };
 
@@ -753,6 +879,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     equipos,
     acabado,
     contactos,
+    cotizaciones,
+    seguimientos,
     addRecepcion,
     addHornada,
     addVenta,
@@ -763,12 +891,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addEquipo,
     addAcabado,
     addContacto,
+    addCotizacion,
+    addSeguimiento,
     updateCliente,
     updateProyecto,
     updateDocumento,
     updateEquipo,
     updateAcabado,
     updateContacto,
+    updateCotizacion,
+    updateSeguimiento,
     deleteRecepcion,
     deleteHornada,
     deleteVenta,
@@ -777,6 +909,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteEquipo,
     deleteAcabado,
     deleteContacto,
+    deleteCotizacion,
+    deleteSeguimiento,
     kpis,
   };
 

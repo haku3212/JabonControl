@@ -3,7 +3,7 @@ const { v4: uuid } = require('uuid');
 const dbModule = require('../db');
 const { logAudit } = require('../db');
 
-const allowedModules = new Set(['proyectos', 'documentos', 'equipos', 'acabado', 'contactos']);
+const allowedModules = new Set(['proyectos', 'documentos', 'equipos', 'acabado', 'contactos', 'cotizaciones', 'seguimientos']);
 
 function parseRecord(row) {
   try {

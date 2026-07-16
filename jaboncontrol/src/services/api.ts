@@ -209,3 +209,5 @@ export const documentosService = createCrudService('/documentos');
 export const equiposService = createCrudService('/equipos');
 export const acabadoService = createCrudService('/acabado');
 export const contactosService = createCrudService('/contactos');
+export const cotizacionesService = createCrudService('/cotizaciones');
+export const seguimientosService = createCrudService('/seguimientos');

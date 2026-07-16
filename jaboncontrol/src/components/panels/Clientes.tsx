@@ -6,7 +6,8 @@ import { useAppContext } from '../../context/AppContext';
 import type { Cliente } from '../../types';
 import { ClienteForm } from '../forms/ClienteForm';
 import { ReportDownloadModal } from '../common/ReportDownloadModal';
-import { generarReporteCliente } from '../../services/pdfService';
+import { generarCotizacionPDF, generarReporteCliente } from '../../services/pdfService';
+import type { Cotizacion, SeguimientoComercial } from '../../types';
 
 interface ClientesProps {
   onNewClick?: () => void;
@@ -33,7 +34,20 @@ function getDebtStatus(cliente: any) {
 }
 
 export function Clientes({ onNewClick }: ClientesProps = {}) {
-  const { clientes, ventas, cobros, updateCliente } = useAppContext();
+  const {
+    clientes,
+    ventas,
+    cobros,
+    cotizaciones,
+    seguimientos,
+    updateCliente,
+    addCotizacion,
+    updateCotizacion,
+    deleteCotizacion,
+    addSeguimiento,
+    updateSeguimiento,
+    deleteSeguimiento,
+  } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState<Cliente | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
@@ -42,11 +56,14 @@ export function Clientes({ onNewClick }: ClientesProps = {}) {
   const enrichedClientes = useMemo(() => clientes.map((cliente) => {
     const ventasCliente = ventas.filter((venta) => venta.cliente === cliente.nombre);
     const cobrosCliente = cobros.filter((cobro) => cobro.cliente === cliente.nombre);
+    const cotizacionesCliente = cotizaciones.filter((cotizacion) => cotizacion.cliente === cliente.nombre);
+    const seguimientosCliente = seguimientos.filter((seguimiento) => seguimiento.cliente === cliente.nombre);
     const ventaTotal = ventasCliente.reduce((sum, venta) => sum + (venta.total || venta.precioTotal || 0), cliente.ventaMes || 0);
     const cobrado = cobrosCliente.reduce((sum, cobro) => sum + cobro.montoCobrado, cliente.cobradoMes || 0);
     const saldo = Math.max(0, ventaTotal - cobrado);
-    return { ...cliente, ventaTotal, cobrado, saldo, ventasCliente, cobrosCliente };
-  }), [clientes, ventas, cobros]);
+    const ultimaVenta = ventasCliente.slice().sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+    return { ...cliente, ventaTotal, cobrado, saldo, ventasCliente, cobrosCliente, cotizacionesCliente, seguimientosCliente, ultimaVenta };
+  }), [clientes, ventas, cobros, cotizaciones, seguimientos]);
 
   const filteredClientes = enrichedClientes.filter((c) => {
     const query = searchTerm.toLowerCase();
@@ -137,6 +154,12 @@ export function Clientes({ onNewClick }: ClientesProps = {}) {
         onClose={() => setSelected(null)}
         onEdit={(cliente) => setEditing(cliente)}
         onReport={(cliente) => setReportCliente(cliente)}
+        onAddCotizacion={addCotizacion}
+        onUpdateCotizacion={updateCotizacion}
+        onDeleteCotizacion={deleteCotizacion}
+        onAddSeguimiento={addSeguimiento}
+        onUpdateSeguimiento={updateSeguimiento}
+        onDeleteSeguimiento={deleteSeguimiento}
       />
 
       <Modal isOpen={Boolean(editing)} title="Editar cliente" onClose={() => setEditing(null)}>
@@ -173,14 +196,47 @@ function Summary({ label, value, tone }: { label: string; value: string; tone: s
   );
 }
 
-function ClienteFicha({ cliente, onClose, onEdit, onReport }: { cliente: any | null; onClose: () => void; onEdit: (cliente: any) => void; onReport: (cliente: any) => void }) {
+function ClienteFicha({
+  cliente,
+  onClose,
+  onEdit,
+  onReport,
+  onAddCotizacion,
+  onUpdateCotizacion,
+  onDeleteCotizacion,
+  onAddSeguimiento,
+  onUpdateSeguimiento,
+  onDeleteSeguimiento,
+}: {
+  cliente: any | null;
+  onClose: () => void;
+  onEdit: (cliente: any) => void;
+  onReport: (cliente: any) => void;
+  onAddCotizacion: (data: Cotizacion) => void;
+  onUpdateCotizacion: (id: string, data: Cotizacion) => void;
+  onDeleteCotizacion: (id: string) => void;
+  onAddSeguimiento: (data: SeguimientoComercial) => void;
+  onUpdateSeguimiento: (id: string, data: SeguimientoComercial) => void;
+  onDeleteSeguimiento: (id: string) => void;
+}) {
+  const [quoteForm, setQuoteForm] = useState<Cotizacion | null>(null);
+  const [taskForm, setTaskForm] = useState<SeguimientoComercial | null>(null);
+
   if (!cliente) return null;
   const debtStatus = getDebtStatus(cliente);
+  const pendingTasks = cliente.seguimientosCliente.filter((item: SeguimientoComercial) => item.estado !== 'completado').length;
+  const acceptedQuotes = cliente.cotizacionesCliente.filter((item: Cotizacion) => item.estado === 'aceptada').length;
 
   return (
     <Modal isOpen={Boolean(cliente)} title={`Ficha de ${cliente.nombre}`} onClose={onClose}>
       <div className="space-y-5">
         <div className="flex flex-wrap justify-end gap-2">
+          <button onClick={() => setTaskForm(emptySeguimiento(cliente.nombre))} className="px-3 py-2 bg-dark-surface3 text-text-primary text-xs font-semibold rounded border border-dark-border hover:border-accent-blue">
+            Nuevo seguimiento
+          </button>
+          <button onClick={() => setQuoteForm(emptyCotizacion(cliente.nombre))} className="px-3 py-2 bg-dark-surface3 text-text-primary text-xs font-semibold rounded border border-dark-border hover:border-accent-yellow">
+            Nueva cotizacion
+          </button>
           <button onClick={() => onEdit(cliente)} className="px-3 py-2 bg-dark-surface3 text-text-primary text-xs font-semibold rounded border border-dark-border hover:border-accent-yellow">
             Editar datos
           </button>
@@ -204,6 +260,13 @@ function ClienteFicha({ cliente, onClose, onEdit, onReport }: { cliente: any | n
           <Summary label="Saldo" value={money(cliente.saldo)} tone={cliente.saldo > 0 ? 'text-status-danger' : 'text-status-success'} />
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <Info label="Ultima compra" value={cliente.ultimaVenta?.fecha || 'Sin compras'} />
+          <Info label="Cotizaciones" value={`${cliente.cotizacionesCliente.length} registradas`} />
+          <Info label="Cotizaciones aceptadas" value={String(acceptedQuotes)} />
+          <Info label="Seguimientos pendientes" value={String(pendingTasks)} />
+        </div>
+
         <div className="rounded border border-dark-border bg-dark-surface2 px-4 py-3">
           <div className="text-xs font-mono text-text-tertiary uppercase">Estado de deuda</div>
           <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -216,7 +279,76 @@ function ClienteFicha({ cliente, onClose, onEdit, onReport }: { cliente: any | n
           <MiniTable title="Historial de ventas" empty="Sin ventas registradas" rows={cliente.ventasCliente.slice().reverse().map((v: any) => [v.fecha, v.numeroNE, money(v.total || v.precioTotal || 0), v.tipoPago])} />
           <MiniTable title="Historial de cobros" empty="Sin cobros registrados" rows={cliente.cobrosCliente.slice().reverse().map((c: any) => [c.fecha, c.notasCorrespondientes || '-', money(c.montoCobrado), c.metodoPago])} />
         </div>
+
+        <CrmList
+          title="Cotizaciones"
+          empty="Sin cotizaciones registradas"
+          rows={cliente.cotizacionesCliente}
+          render={(cotizacion: Cotizacion) => (
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <div className="font-semibold text-text-primary">{cotizacion.numero} - {money(cotizacion.total)}</div>
+                <div className="text-xs text-text-tertiary">{cotizacion.fecha} · Validez {cotizacion.validezDias} dias · {cotizacion.responsable || 'Sin responsable'}</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge label={cotizacion.estado} type={cotizacion.estado === 'aceptada' ? 'success' : cotizacion.estado === 'rechazada' ? 'danger' : 'info'} />
+                <button onClick={() => generarCotizacionPDF(cotizacion)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-accent-yellow">PDF</button>
+                <button onClick={() => setQuoteForm(cotizacion)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-accent-blue">Editar</button>
+                <button onClick={() => onDeleteCotizacion(cotizacion.id)} className="text-xs px-2 py-1 rounded border border-dark-border text-status-danger hover:border-status-danger">Eliminar</button>
+              </div>
+            </div>
+          )}
+        />
+
+        <CrmList
+          title="Seguimiento comercial"
+          empty="Sin tareas o notas de seguimiento"
+          rows={cliente.seguimientosCliente}
+          render={(seguimiento: SeguimientoComercial) => (
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <div className="font-semibold text-text-primary">{seguimiento.asunto}</div>
+                <div className="text-xs text-text-tertiary">{seguimiento.fecha} · {seguimiento.tipo} · {seguimiento.responsable || 'Sin responsable'}</div>
+                {seguimiento.notas && <div className="text-xs text-text-secondary mt-1">{seguimiento.notas}</div>}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge label={seguimiento.prioridad} type={seguimiento.prioridad === 'alta' ? 'danger' : seguimiento.prioridad === 'media' ? 'warning' : 'neutral'} />
+                <Badge label={seguimiento.estado} type={seguimiento.estado === 'completado' ? 'success' : 'info'} />
+                <button onClick={() => setTaskForm(seguimiento)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-accent-blue">Editar</button>
+                <button onClick={() => onDeleteSeguimiento(seguimiento.id)} className="text-xs px-2 py-1 rounded border border-dark-border text-status-danger hover:border-status-danger">Eliminar</button>
+              </div>
+            </div>
+          )}
+        />
       </div>
+
+      <Modal isOpen={Boolean(quoteForm)} title={quoteForm?.id ? 'Editar cotizacion' : 'Nueva cotizacion'} onClose={() => setQuoteForm(null)}>
+        {quoteForm && (
+          <CotizacionForm
+            initialData={quoteForm}
+            onCancel={() => setQuoteForm(null)}
+            onSave={(data) => {
+              if (quoteForm.id) onUpdateCotizacion(quoteForm.id, data);
+              else onAddCotizacion(data);
+              setQuoteForm(null);
+            }}
+          />
+        )}
+      </Modal>
+
+      <Modal isOpen={Boolean(taskForm)} title={taskForm?.id ? 'Editar seguimiento' : 'Nuevo seguimiento'} onClose={() => setTaskForm(null)}>
+        {taskForm && (
+          <SeguimientoForm
+            initialData={taskForm}
+            onCancel={() => setTaskForm(null)}
+            onSave={(data) => {
+              if (taskForm.id) onUpdateSeguimiento(taskForm.id, data);
+              else onAddSeguimiento(data);
+              setTaskForm(null);
+            }}
+          />
+        )}
+      </Modal>
     </Modal>
   );
 }
@@ -228,6 +360,198 @@ function Info({ label, value }: { label: string; value: string }) {
       <div className="text-sm text-text-primary mt-1 break-words">{value}</div>
     </div>
   );
+}
+
+function emptyCotizacion(cliente: string): Cotizacion {
+  const stamp = Date.now();
+  return {
+    id: '',
+    numero: `COT-${String(stamp).slice(-6)}`,
+    fecha: new Date().toISOString().slice(0, 10),
+    cliente,
+    estado: 'borrador',
+    validezDias: 15,
+    responsable: 'Ventas',
+    notas: '',
+    items: [{ id: `item-${stamp}`, descripcion: 'Jabon en caja x50 pastas', cantidad: 1, precioUnitario: 0 }],
+    total: 0,
+  };
+}
+
+function emptySeguimiento(cliente: string): SeguimientoComercial {
+  return {
+    id: '',
+    cliente,
+    tipo: 'llamada',
+    asunto: '',
+    fecha: new Date().toISOString().slice(0, 10),
+    responsable: 'Ventas',
+    estado: 'pendiente',
+    prioridad: 'media',
+    notas: '',
+  };
+}
+
+function CrmList<T>({ title, rows, empty, render }: { title: string; rows: T[]; empty: string; render: (row: T) => JSX.Element }) {
+  return (
+    <div className="rounded border border-dark-border overflow-hidden">
+      <div className="px-4 py-3 bg-dark-surface2 text-xs font-mono text-text-tertiary uppercase">{title}</div>
+      {rows.length === 0 ? (
+        <div className="px-4 py-5 text-sm text-text-tertiary">{empty}</div>
+      ) : (
+        <div className="divide-y divide-dark-border">
+          {rows.map((row: any) => (
+            <div key={row.id} className="p-3">
+              {render(row)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CotizacionForm({ initialData, onSave, onCancel }: { initialData: Cotizacion; onSave: (data: Cotizacion) => void; onCancel: () => void }) {
+  const [form, setForm] = useState<Cotizacion>(initialData);
+
+  const updateItem = (id: string, patch: Partial<Cotizacion['items'][number]>) => {
+    setForm((current) => {
+      const items = current.items.map((item) => (item.id === id ? { ...item, ...patch } : item));
+      return { ...current, items, total: calcQuoteTotal(items) };
+    });
+  };
+
+  const addItem = () => {
+    const item = { id: `item-${Date.now()}`, descripcion: '', cantidad: 1, precioUnitario: 0 };
+    setForm((current) => ({ ...current, items: [...current.items, item] }));
+  };
+
+  const removeItem = (id: string) => {
+    setForm((current) => {
+      const items = current.items.filter((item) => item.id !== id);
+      return { ...current, items, total: calcQuoteTotal(items) };
+    });
+  };
+
+  const submit = () => {
+    if (!form.numero.trim() || form.items.length === 0) {
+      alert('La cotizacion necesita numero y al menos un item.');
+      return;
+    }
+    onSave({
+      ...form,
+      id: form.id || Date.now().toString(),
+      total: calcQuoteTotal(form.items),
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <FormInput label="Numero" value={form.numero} onChange={(value) => setForm({ ...form, numero: value })} />
+        <FormInput label="Fecha" type="date" value={form.fecha} onChange={(value) => setForm({ ...form, fecha: value })} />
+        <FormInput label="Validez dias" type="number" value={String(form.validezDias)} onChange={(value) => setForm({ ...form, validezDias: Number(value || 0) })} />
+        <FormInput label="Responsable" value={form.responsable} onChange={(value) => setForm({ ...form, responsable: value })} />
+        <label>
+          <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">Estado</span>
+          <select value={form.estado} onChange={(event) => setForm({ ...form, estado: event.target.value as Cotizacion['estado'] })} className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm outline-none">
+            <option value="borrador">Borrador</option>
+            <option value="enviada">Enviada</option>
+            <option value="aceptada">Aceptada</option>
+            <option value="rechazada">Rechazada</option>
+            <option value="vencida">Vencida</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="rounded border border-dark-border overflow-hidden">
+        <div className="px-3 py-2 bg-dark-surface2 flex items-center justify-between">
+          <span className="text-xs font-mono text-text-tertiary uppercase">Items</span>
+          <button onClick={addItem} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-accent-yellow">Agregar item</button>
+        </div>
+        <div className="space-y-2 p-3">
+          {form.items.map((item) => (
+            <div key={item.id} className="grid grid-cols-1 md:grid-cols-[1fr_90px_120px_70px] gap-2">
+              <input value={item.descripcion} onChange={(event) => updateItem(item.id, { descripcion: event.target.value })} placeholder="Descripcion" className="bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-sm outline-none" />
+              <input value={item.cantidad} type="number" onChange={(event) => updateItem(item.id, { cantidad: Number(event.target.value || 0) })} className="bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-sm outline-none" />
+              <input value={item.precioUnitario} type="number" onChange={(event) => updateItem(item.id, { precioUnitario: Number(event.target.value || 0) })} className="bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-sm outline-none" />
+              <button onClick={() => removeItem(item.id)} className="text-xs rounded border border-dark-border text-status-danger hover:border-status-danger">Quitar</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <label>
+        <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">Notas</span>
+        <textarea value={form.notas} onChange={(event) => setForm({ ...form, notas: event.target.value })} rows={3} className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-sm outline-none resize-none" />
+      </label>
+
+      <div className="flex items-center justify-between pt-4 border-t border-dark-border">
+        <div className="font-mono text-accent-yellow">Total: {money(calcQuoteTotal(form.items))}</div>
+        <div className="flex gap-2">
+          <button onClick={onCancel} className="px-4 py-2 rounded border border-dark-border text-sm">Cancelar</button>
+          <button onClick={submit} className="px-4 py-2 rounded bg-accent-yellow text-black text-sm font-semibold">Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SeguimientoForm({ initialData, onSave, onCancel }: { initialData: SeguimientoComercial; onSave: (data: SeguimientoComercial) => void; onCancel: () => void }) {
+  const [form, setForm] = useState<SeguimientoComercial>(initialData);
+
+  const submit = () => {
+    if (!form.asunto.trim()) {
+      alert('Ingrese un asunto para el seguimiento.');
+      return;
+    }
+    onSave({ ...form, id: form.id || Date.now().toString() });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <FormInput label="Asunto" value={form.asunto} onChange={(value) => setForm({ ...form, asunto: value })} />
+        <FormInput label="Fecha" type="date" value={form.fecha} onChange={(value) => setForm({ ...form, fecha: value })} />
+        <FormInput label="Responsable" value={form.responsable} onChange={(value) => setForm({ ...form, responsable: value })} />
+        <SelectField label="Tipo" value={form.tipo} onChange={(value) => setForm({ ...form, tipo: value as SeguimientoComercial['tipo'] })} options={['llamada', 'cobro', 'visita', 'cotizacion', 'nota']} />
+        <SelectField label="Estado" value={form.estado} onChange={(value) => setForm({ ...form, estado: value as SeguimientoComercial['estado'] })} options={['pendiente', 'en_proceso', 'completado']} />
+        <SelectField label="Prioridad" value={form.prioridad} onChange={(value) => setForm({ ...form, prioridad: value as SeguimientoComercial['prioridad'] })} options={['baja', 'media', 'alta']} />
+      </div>
+      <label>
+        <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">Notas</span>
+        <textarea value={form.notas} onChange={(event) => setForm({ ...form, notas: event.target.value })} rows={4} className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-sm outline-none resize-none" />
+      </label>
+      <div className="flex justify-end gap-2 pt-4 border-t border-dark-border">
+        <button onClick={onCancel} className="px-4 py-2 rounded border border-dark-border text-sm">Cancelar</button>
+        <button onClick={submit} className="px-4 py-2 rounded bg-accent-yellow text-black text-sm font-semibold">Guardar</button>
+      </div>
+    </div>
+  );
+}
+
+function FormInput({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+  return (
+    <label>
+      <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">{label}</span>
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm outline-none" />
+    </label>
+  );
+}
+
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[] }) {
+  return (
+    <label>
+      <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm outline-none">
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function calcQuoteTotal(items: Cotizacion['items']) {
+  return items.reduce((sum, item) => sum + Number(item.cantidad || 0) * Number(item.precioUnitario || 0), 0);
 }
 
 function MiniTable({ title, rows, empty }: { title: string; rows: string[][]; empty: string }) {

@@ -162,3 +162,33 @@ export interface ContactoEmpresa {
   estado: 'activo' | 'inactivo';
   fechaRegistro: string;
 }
+
+export interface Cotizacion {
+  id: string;
+  numero: string;
+  fecha: string;
+  cliente: string;
+  estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada' | 'vencida';
+  validezDias: number;
+  responsable: string;
+  notas: string;
+  items: Array<{
+    id: string;
+    descripcion: string;
+    cantidad: number;
+    precioUnitario: number;
+  }>;
+  total: number;
+}
+
+export interface SeguimientoComercial {
+  id: string;
+  cliente: string;
+  tipo: 'llamada' | 'cobro' | 'visita' | 'cotizacion' | 'nota';
+  asunto: string;
+  fecha: string;
+  responsable: string;
+  estado: 'pendiente' | 'en_proceso' | 'completado';
+  prioridad: 'baja' | 'media' | 'alta';
+  notas: string;
+}

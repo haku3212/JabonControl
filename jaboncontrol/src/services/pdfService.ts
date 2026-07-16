@@ -399,6 +399,42 @@ export async function generarReporteCliente(cliente: any, ventas: any[], cobros:
   save(doc, `Ficha_cliente_${cliente.nombre.replace(/\s+/g, '_')}.pdf`);
 }
 
+export async function generarCotizacionPDF(cotizacion: any, options: ReportOptions = {}) {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  header(doc, 'venta', options.title || 'Cotizacion comercial', options.subtitle || cotizacion.numero, options);
+  let y = 54;
+
+  sectionTitle(doc, 'Datos de la cotizacion', y);
+  y = keyValueGrid(doc, [
+    ['Numero', cotizacion.numero],
+    ['Fecha', cotizacion.fecha],
+    ['Cliente', cotizacion.cliente],
+    ['Estado', cotizacion.estado],
+    ['Validez', `${cotizacion.validezDias || 0} dias`],
+    ['Responsable', cotizacion.responsable || '-'],
+  ], y + 9);
+
+  sectionTitle(doc, 'Detalle', y);
+  y = table(doc, ['Descripcion', 'Cant.', 'P. Unit.', 'Subtotal'], (cotizacion.items || []).map((item: any) => [
+    item.descripcion,
+    String(item.cantidad || 0),
+    money(item.precioUnitario || 0),
+    money((item.cantidad || 0) * (item.precioUnitario || 0)),
+  ]), y + 9, [86, 22, 34, 34]);
+
+  y = totalBand(doc, 'Total cotizado', money(cotizacion.total || 0), y + 4);
+
+  if (cotizacion.notas) {
+    sectionTitle(doc, 'Notas', y + 8);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(BRAND.muted);
+    doc.text(doc.splitTextToSize(cotizacion.notas, 180), 14, y + 20);
+  }
+
+  save(doc, `Cotizacion_${cotizacion.numero || cotizacion.cliente}.pdf`);
+}
+
 export async function generarReporteHornadasMensual(hornadas: any[], options: ReportOptions = {}) {
   const doc = new jsPDF('p', 'mm', 'a4');
   header(doc, 'hornada', options.title || 'Reporte mensual de hornadas', options.subtitle || `${hornadas.length} registros`, options);
