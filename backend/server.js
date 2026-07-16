@@ -21,6 +21,11 @@ const crypto = require('crypto');
 
 const app = express();
 
+// Render sirve la app detras de un proxy; esto permite que express-rate-limit use la IP real del cliente.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Lista de origenes permitidos; en desarrollo acepta localhost y en Render acepta su URL publica.
 const allowedOrigins = (process.env.CORS_ORIGIN || [
   'http://127.0.0.1:5173',
