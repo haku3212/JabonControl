@@ -57,7 +57,6 @@ export function ClienteForm({ onSave, onCancel, initialData }: ClienteFormProps)
         <Field label="Telefono *" type="tel" value={form.telefono} onChange={(value) => setForm({ ...form, telefono: value })} placeholder="+591 70000000" />
         <Field label="Gmail / correo" type="email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} placeholder="cliente@gmail.com" />
         <Field label="Ciudad" value={form.ciudad} onChange={(value) => setForm({ ...form, ciudad: value })} placeholder="Santa Cruz" />
-        <Field label="Venta del mes (Bs)" type="number" value={String(form.ventaMes || '')} onChange={(value) => setForm({ ...form, ventaMes: Number(value) })} placeholder="0" />
 
         <label className="block sm:col-span-2">
           <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">Direccion *</span>

@@ -8,6 +8,7 @@ import { generarReporteFinanciero } from '../../services/pdfService';
 import { ReportDownloadModal } from '../common/ReportDownloadModal';
 import { defaultDateRange, filterByDateRange, rangeLabel } from '../../utils/dateFilters';
 import { exportFullBackup } from '../../utils/backupExport';
+import { resumenClienteDesdeVentas, ventaSaldoPendiente } from '../../utils/financial';
 
 const money = (value: number) => `Bs ${Math.round(value || 0).toLocaleString('es-BO')}`;
 
@@ -33,7 +34,7 @@ export function Reportes() {
   const resumen = useMemo(() => {
     const ventasTotal = filteredVentas.reduce((sum, venta) => sum + (venta.total || venta.precioTotal || 0), 0);
     const cobrado = filteredCobros.reduce((sum, cobro) => sum + cobro.montoCobrado, 0);
-    const porCobrar = filteredVentas.reduce((sum, venta) => sum + (venta.saldoPendiente ?? (venta.tipoPago === 'credito' ? (venta.total || venta.precioTotal || 0) : 0)), 0);
+    const porCobrar = filteredVentas.reduce((sum, venta) => sum + ventaSaldoPendiente(venta), 0);
     const compras = filteredRecepciones.reduce((sum, item) => sum + item.precioTotal, 0);
     const produccion = filteredHornadas.reduce((sum, item) => sum + Number(item.produccionTotal || 0), 0);
     const rendimiento = filteredHornadas.length ? filteredHornadas.reduce((sum, item) => sum + Number(item.rendimiento || 0), 0) / filteredHornadas.length : 0;
@@ -58,7 +59,14 @@ export function Reportes() {
     rendimiento: Number(hornada.rendimiento || 0),
   }));
 
-  const topClientes = useMemo(() => [...clientes].sort((a, b) => (b.ventaMes || 0) - (a.ventaMes || 0)).slice(0, 6), [clientes]);
+  const topClientes = useMemo(() => clientes
+    .map((cliente) => ({
+      ...cliente,
+      ...resumenClienteDesdeVentas(cliente, filteredVentas),
+    }))
+    .filter((cliente) => cliente.ventaTotal > 0 || cliente.saldo > 0)
+    .sort((a, b) => b.ventaTotal - a.ventaTotal)
+    .slice(0, 6), [clientes, filteredVentas]);
   const maxFormato = Math.max(1, ...ventasPorFormato.map(([, value]) => value));
   const ultimaVenta = filteredVentas[filteredVentas.length - 1];
   const ultimaHornada = filteredHornadas[filteredHornadas.length - 1];
@@ -159,17 +167,23 @@ export function Reportes() {
               </thead>
               <tbody>
                 {topClientes.map((cliente) => {
-                  const saldo = Math.max(0, (cliente.ventaMes || 0) - (cliente.cobradoMes || 0));
                   return (
                     <tr key={cliente.id} className="border-b border-dark-border">
                       <td className="px-3 py-3 text-text-primary">{cliente.nombre}</td>
                       <td className="px-3 py-3 text-text-secondary capitalize">{cliente.tipo}</td>
-                      <td className="px-3 py-3 font-mono text-accent-yellow">{money(cliente.ventaMes || 0)}</td>
-                      <td className="px-3 py-3 font-mono text-status-success">{money(cliente.cobradoMes || 0)}</td>
-                      <td className="px-3 py-3"><Badge label={saldo > 0 ? 'Saldo' : 'Al dia'} type={saldo > 0 ? 'warning' : 'success'} /></td>
+                      <td className="px-3 py-3 font-mono text-accent-yellow">{money(cliente.ventaTotal)}</td>
+                      <td className="px-3 py-3 font-mono text-status-success">{money(cliente.cobrado)}</td>
+                      <td className="px-3 py-3"><Badge label={cliente.saldo > 0 ? 'Saldo' : 'Al dia'} type={cliente.saldo > 0 ? 'warning' : 'success'} /></td>
                     </tr>
                   );
                 })}
+                {topClientes.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-8 text-center text-sm text-text-tertiary">
+                      No hay ventas de clientes en este periodo.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

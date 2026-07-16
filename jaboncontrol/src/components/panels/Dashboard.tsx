@@ -6,6 +6,7 @@ import { Badge } from '../common/Badge';
 import { DateRangeFilter } from '../common/DateRangeFilter';
 import { useAppContext } from '../../context/AppContext';
 import { defaultDateRange, filterByDateRange, rangeLabel } from '../../utils/dateFilters';
+import { resumenClienteDesdeVentas, ventaSaldoPendiente } from '../../utils/financial';
 
 const money = (value: number) => `Bs ${Math.round(value || 0).toLocaleString('es-BO')}`;
 
@@ -36,7 +37,7 @@ export function Dashboard() {
     const ventasCredito = filteredVentas.filter((venta) => venta.tipoPago === 'credito');
 
     // Calculamos saldo pendiente usando saldoPendiente cuando existe o total de credito como respaldo.
-    const porCobrar = filteredVentas.reduce((sum, venta) => sum + (venta.saldoPendiente ?? (venta.tipoPago === 'credito' ? (venta.total || venta.precioTotal || 0) : 0)), 0);
+    const porCobrar = filteredVentas.reduce((sum, venta) => sum + ventaSaldoPendiente(venta), 0);
 
     // Rendimiento promedio de hornadas del periodo.
     const rendimiento = filteredHornadas.length ? filteredHornadas.reduce((sum, h) => sum + Number(h.rendimiento || 0), 0) / filteredHornadas.length : 0;
@@ -51,7 +52,15 @@ export function Dashboard() {
 
   const ultimasVentas = filteredVentas.slice(-5).reverse();
   const produccion = filteredHornadas.slice(-8);
-  const topClientes = [...clientes].sort((a, b) => (b.ventaMes || 0) - (a.ventaMes || 0)).slice(0, 5);
+  const topClientes = clientes
+    .map((cliente) => ({
+      ...cliente,
+      ...resumenClienteDesdeVentas(cliente, filteredVentas),
+    }))
+    .filter((cliente) => cliente.ventaTotal > 0)
+    .sort((a, b) => b.ventaTotal - a.ventaTotal)
+    .slice(0, 5);
+  const maxClienteVenta = Math.max(1, topClientes[0]?.ventaTotal || 1);
 
   // Datos adaptados a Recharts para mostrar produccion y rendimiento juntos.
   const produccionChart = produccion.map((h) => ({
@@ -136,13 +145,14 @@ export function Dashboard() {
               <div key={cliente.id}>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-text-primary">{cliente.nombre}</span>
-                  <span className="font-mono text-accent-yellow">{money(cliente.ventaMes || 0)}</span>
+                  <span className="font-mono text-accent-yellow">{money(cliente.ventaTotal)}</span>
                 </div>
                 <div className="h-1.5 bg-dark-surface3 rounded overflow-hidden">
-                  <div className="h-full bg-accent-yellow" style={{ width: `${Math.min(100, ((cliente.ventaMes || 0) / Math.max(1, topClientes[0]?.ventaMes || 1)) * 100)}%` }} />
+                  <div className="h-full bg-accent-yellow" style={{ width: `${Math.min(100, (cliente.ventaTotal / maxClienteVenta) * 100)}%` }} />
                 </div>
               </div>
             ))}
+            {topClientes.length === 0 && <div className="py-4 text-sm text-text-tertiary">Sin ventas de clientes en este periodo.</div>}
           </div>
         </Card>
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { ventaSaldoPendiente } from '../../utils/financial';
 import { finanzasService } from '../../services/api';
 import { Badge } from '../common/Badge';
 import { Card } from '../common/Card';
@@ -147,7 +148,7 @@ export function Finanzas() {
   const resumen = useMemo(() => {
     const ingresosVentas = ventas.reduce((sum, venta) => sum + (venta.total || venta.precioTotal || 0), 0);
     const cobrado = cobros.reduce((sum, cobro) => sum + cobro.montoCobrado, 0);
-    const porCobrar = ventas.reduce((sum, venta) => sum + (venta.saldoPendiente ?? (venta.tipoPago === 'credito' ? (venta.total || venta.precioTotal || 0) : 0)), 0);
+    const porCobrar = ventas.reduce((sum, venta) => sum + ventaSaldoPendiente(venta), 0);
     const ingresosExtra = movimientos.filter((m) => m.tipo === 'ingreso').reduce((sum, item) => sum + Number(item.monto || 0), 0);
     const egresos = movimientos.filter((m) => m.tipo === 'egreso').reduce((sum, item) => sum + Number(item.monto || 0), 0);
     const ingresosTotales = ingresosVentas + ingresosExtra;

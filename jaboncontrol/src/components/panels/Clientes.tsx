@@ -8,6 +8,7 @@ import { ClienteForm } from '../forms/ClienteForm';
 import { ReportDownloadModal } from '../common/ReportDownloadModal';
 import { generarCotizacionPDF, generarReporteCliente } from '../../services/pdfService';
 import type { Cotizacion, SeguimientoComercial } from '../../types';
+import { resumenClienteDesdeVentas } from '../../utils/financial';
 
 interface ClientesProps {
   onNewClick?: () => void;
@@ -54,15 +55,23 @@ export function Clientes({ onNewClick }: ClientesProps = {}) {
   const [reportCliente, setReportCliente] = useState<any | null>(null);
 
   const enrichedClientes = useMemo(() => clientes.map((cliente) => {
-    const ventasCliente = ventas.filter((venta) => venta.cliente === cliente.nombre);
+    const resumenFinanciero = resumenClienteDesdeVentas(cliente, ventas);
+    const ventasCliente = resumenFinanciero.ventasCliente;
     const cobrosCliente = cobros.filter((cobro) => cobro.cliente === cliente.nombre);
     const cotizacionesCliente = cotizaciones.filter((cotizacion) => cotizacion.cliente === cliente.nombre);
     const seguimientosCliente = seguimientos.filter((seguimiento) => seguimiento.cliente === cliente.nombre);
-    const ventaTotal = ventasCliente.reduce((sum, venta) => sum + (venta.total || venta.precioTotal || 0), cliente.ventaMes || 0);
-    const cobrado = cobrosCliente.reduce((sum, cobro) => sum + cobro.montoCobrado, cliente.cobradoMes || 0);
-    const saldo = Math.max(0, ventaTotal - cobrado);
     const ultimaVenta = ventasCliente.slice().sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
-    return { ...cliente, ventaTotal, cobrado, saldo, ventasCliente, cobrosCliente, cotizacionesCliente, seguimientosCliente, ultimaVenta };
+    return {
+      ...cliente,
+      ventaTotal: resumenFinanciero.ventaTotal,
+      cobrado: resumenFinanciero.cobrado,
+      saldo: resumenFinanciero.saldo,
+      ventasCliente,
+      cobrosCliente,
+      cotizacionesCliente,
+      seguimientosCliente,
+      ultimaVenta,
+    };
   }), [clientes, ventas, cobros, cotizaciones, seguimientos]);
 
   const filteredClientes = enrichedClientes.filter((c) => {

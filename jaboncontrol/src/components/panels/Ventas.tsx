@@ -7,6 +7,7 @@ import { ReportDownloadModal } from '../common/ReportDownloadModal';
 import { useAppContext } from '../../context/AppContext';
 import { generarReporteVenta } from '../../services/pdfService';
 import { defaultDateRange, filterByDateRange } from '../../utils/dateFilters';
+import { ventaSaldoPendiente } from '../../utils/financial';
 
 interface VentasProps {
   onNewClick?: () => void;
@@ -30,8 +31,8 @@ export function Ventas({ onNewClick }: VentasProps = {}) {
   });
 
   const totalPeriodo = filteredVentas.reduce((sum, v) => sum + (v.total || v.precioTotal || 0), 0);
-  const contado = filteredVentas.filter((v) => v.tipoPago === 'contado');
-  const credito = filteredVentas.filter((v) => v.tipoPago === 'credito');
+  const contado = filteredVentas.filter((v) => ventaSaldoPendiente(v) <= 0);
+  const credito = filteredVentas.filter((v) => ventaSaldoPendiente(v) > 0);
   // Borrado seguro: exige confirmacion antes de tocar datos.
   const safeDelete = (venta: any) => {
     // El mensaje incluye numero y cliente para evitar borrar la nota equivocada.
@@ -100,7 +101,12 @@ export function Ventas({ onNewClick }: VentasProps = {}) {
                   <td className="px-3 py-2 font-mono text-text-secondary">{venta.formato?.toLowerCase().includes('caja') ? (venta.unidadesPorCaja || 50) : '-'}</td>
                   <td className="px-3 py-2 font-mono text-text-secondary">{money(venta.precioUnitario)}</td>
                   <td className="px-3 py-2 font-mono text-accent-yellow">{money(venta.total || venta.precioTotal || 0)}</td>
-                  <td className="px-3 py-2"><Badge label={venta.tipoPago === 'contado' ? 'Pagado' : 'Credito'} type={venta.tipoPago === 'contado' ? 'success' : 'warning'} /></td>
+                  <td className="px-3 py-2">
+                    <Badge
+                      label={ventaSaldoPendiente(venta) <= 0 ? 'Pagado' : 'Credito'}
+                      type={ventaSaldoPendiente(venta) <= 0 ? 'success' : 'warning'}
+                    />
+                  </td>
                   <td className="px-3 py-2">
                     <div className="flex gap-2">
                       <button onClick={() => setReportVenta(venta)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-accent-yellow hover:text-accent-yellow" title="Descargar reporte PDF">

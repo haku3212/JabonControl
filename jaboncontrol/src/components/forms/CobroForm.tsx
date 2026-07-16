@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { ventaSaldoPendiente, ventaTotal } from '../../utils/financial';
 
 interface CobroFormProps {
   onSave: (data: any) => Promise<void>;
@@ -27,9 +28,7 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
   const [loading, setLoading] = useState(false);
 
   // Calcula el saldo real de una venta; si no existe saldoPendiente, usa el total solo cuando es credito.
-  const getSaldoVenta = (venta: any) => (
-    venta.saldoPendiente ?? (venta.tipoPago === 'credito' ? (venta.total || venta.precioTotal || 0) : 0)
-  );
+  const getSaldoVenta = ventaSaldoPendiente;
 
   // Lista solo clientes con deuda pendiente; esto evita cobrar a clientes que ya estan al dia.
   const clientesConDeuda = useMemo(() => {
@@ -59,7 +58,7 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
       id: venta.id,
       numeroNE: venta.numeroNE,
       fecha: venta.fecha,
-      original: venta.total || venta.precioTotal || 0,
+      original: ventaTotal(venta),
       resto: getSaldoVenta(venta),
     }));
   }, [clienteSeleccionado, ventas]);

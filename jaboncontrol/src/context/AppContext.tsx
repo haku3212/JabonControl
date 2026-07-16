@@ -29,6 +29,7 @@ import {
   seguimientosService,
 } from '../services/api';
 import { calculateFinishedInventory, unitsForSale } from '../utils/inventory';
+import { ventaSaldoPendiente, ventaTotal } from '../utils/financial';
 
 interface AppContextType {
   // Data
@@ -512,7 +513,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     // Agregar localmente primero
-    const dataConId = { ...data, id: data.id || Date.now().toString() };
+    const totalVenta = ventaTotal(data);
+    const dataConId = {
+      ...data,
+      id: data.id || Date.now().toString(),
+      total: data.total ?? data.precioTotal ?? 0,
+      precioTotal: data.precioTotal ?? data.total ?? 0,
+      saldoPendiente: data.saldoPendiente ?? (data.tipoPago === 'credito' ? totalVenta : 0),
+      estado: data.estado || (data.tipoPago === 'credito' ? 'pendiente' : 'pagado'),
+    };
     setVentas([...ventas, dataConId]);
 
     // Si el cliente de la venta no existe, agregarlo automáticamente
@@ -539,7 +548,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Luego guardar venta en API en background
     try {
-      await ventasService.crear(data);
+      await ventasService.crear(dataConId);
     } catch (error) {
       console.log('⚠️ Error al guardar en API:', error);
     }
@@ -556,7 +565,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setVentas(ventas.map((v) => {
         const aplicado = aplicados.get(v.id);
         if (!aplicado) return v;
-        const saldoActual = v.saldoPendiente ?? (v.total || v.precioTotal || 0);
+        const saldoActual = ventaSaldoPendiente(v);
         const nuevoSaldo = Math.max(0, Math.round((saldoActual - aplicado) * 100) / 100);
         return {
           ...v,
@@ -872,10 +881,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     produccionHoy: hornadas.reduce((sum, h) => sum + h.produccionTotal, 0),
     stockJabon: inventario.disponibles,
     ventasMes: ventas.reduce((sum, v) => sum + (v.total || v.precioTotal || 0), 0),
-    cobrosPendientes: ventas.reduce(
-      (sum, v) => sum + (v.saldoPendiente ?? (v.tipoPago === 'credito' ? (v.total || v.precioTotal || 0) : 0)),
-      0
-    ),
+    cobrosPendientes: ventas.reduce((sum, v) => sum + ventaSaldoPendiente(v), 0),
     inventarioDisponible: inventario.disponibles,
     inventarioProducido: inventario.producidas,
     inventarioVendido: inventario.vendidas,

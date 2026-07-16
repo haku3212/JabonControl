@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import { ventaCobrado, ventaSaldoPendiente, ventaTotal as getVentaTotal } from '../utils/financial';
 
 type ReportKind = 'venta' | 'cobro' | 'hornada' | 'recepcion' | 'finanzas' | 'generico';
 
@@ -351,9 +352,9 @@ export async function generarReporteCliente(cliente: any, ventas: any[], cobros:
   header(doc, 'finanzas', options.title || 'Ficha de cliente', options.subtitle || cliente.nombre, options);
   let y = 54;
 
-  const ventaTotal = ventas.reduce((sum, venta) => sum + Number(venta.total || venta.precioTotal || 0), 0);
-  const cobrado = cobros.reduce((sum, cobro) => sum + Number(cobro.montoCobrado || 0), 0);
-  const saldo = Math.max(0, ventaTotal - cobrado);
+  const ventaTotal = ventas.reduce((sum, venta) => sum + getVentaTotal(venta), 0);
+  const cobrado = ventas.reduce((sum, venta) => sum + ventaCobrado(venta), 0);
+  const saldo = ventas.reduce((sum, venta) => sum + ventaSaldoPendiente(venta), 0);
 
   sectionTitle(doc, 'Informacion del cliente', y);
   y = keyValueGrid(doc, [
