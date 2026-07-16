@@ -423,10 +423,40 @@ async function seedDemoData() {
   );
 }
 
+function summarizeDataUrl(value) {
+  const text = String(value || '');
+  const match = text.match(/^data:([^;]+);base64,/);
+  return {
+    adjunto: true,
+    tipo: match?.[1] || 'desconocido',
+    bytesAproximados: Math.round((text.length * 3) / 4),
+  };
+}
+
+function sanitizeAuditValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeAuditValue(item));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.entries(value).reduce((clean, [key, item]) => {
+    if (key === 'archivoData' || key === 'imagenData') {
+      clean[key] = summarizeDataUrl(item);
+      return clean;
+    }
+
+    clean[key] = sanitizeAuditValue(item);
+    return clean;
+  }, {});
+}
+
 function safeJson(value) {
   if (value === undefined) return null;
   try {
-    return JSON.stringify(value ?? null);
+    return JSON.stringify(sanitizeAuditValue(value ?? null));
   } catch {
     return JSON.stringify({ error: 'No se pudo serializar' });
   }

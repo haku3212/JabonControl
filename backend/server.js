@@ -97,8 +97,8 @@ app.use(cors({
   credentials: true,
 }));
 
-// Limita el tamano del JSON para reducir riesgo de abuso/DoS por payloads grandes.
-app.use(express.json({ limit: '1mb' }));
+// Permite adjuntos pequenos en base64 sin que la API los rechace al guardar equipos/documentos.
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '15mb' }));
 
 // Servir archivos estáticos del frontend
 app.use(express.static(path.join(__dirname, 'public')));
@@ -177,6 +177,11 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
   // Log interno para diagnostico del servidor.
   console.error(err.stack);
+
+  // Respuesta clara cuando una imagen o documento supera el limite permitido.
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'El archivo es demasiado grande para guardarlo. Reduzca el peso y vuelva a intentar.' });
+  }
 
   // En produccion no exponemos detalles tecnicos al cliente.
   const isProduction = process.env.NODE_ENV === 'production';

@@ -184,7 +184,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
 
   const handleSaveProyecto = async (data: any) => {
     try {
-      addProyecto({ progreso: 0, ...data });
+      await addProyecto({ progreso: 0, ...data });
       setModalType(null);
       showNotificationMsg('✅ Proyecto registrado correctamente');
     } catch (error) {
@@ -194,7 +194,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
 
   const handleSaveEquipo = async (data: any) => {
     try {
-      addEquipo(data);
+      await addEquipo(data);
       setModalType(null);
       showNotificationMsg('✅ Equipo registrado correctamente');
     } catch (error) {
@@ -204,7 +204,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
 
   const handleSaveDocumento = async (data: any) => {
     try {
-      addDocumento(data);
+      await addDocumento(data);
       setModalType(null);
       showNotificationMsg('✅ Documento guardado correctamente');
     } catch (error) {

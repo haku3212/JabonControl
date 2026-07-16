@@ -116,9 +116,9 @@ export function Equipos({ onNewClick: _onNewClick }: EquiposProps) {
   // Guarda creando o actualizando segun exista editing.
   const handleSave = async (data: EquipoApp) => {
     if (editing) {
-      updateEquipo(editing.id, data);
+      await updateEquipo(editing.id, data);
     } else {
-      addEquipo(data);
+      await addEquipo(data);
     }
     setShowForm(false);
     setEditing(null);

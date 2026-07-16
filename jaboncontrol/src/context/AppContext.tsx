@@ -53,13 +53,13 @@ interface AppContextType {
   addVenta: (data: Venta) => void;
   addCobro: (data: Cobro) => void;
   addCliente: (data: Cliente) => void;
-  addProyecto: (data: Proyecto) => void;
-  addDocumento: (data: DocumentoApp) => void;
-  addEquipo: (data: EquipoApp) => void;
-  addAcabado: (data: RegistroAcabado) => void;
-  addContacto: (data: ContactoEmpresa) => void;
-  addCotizacion: (data: Cotizacion) => void;
-  addSeguimiento: (data: SeguimientoComercial) => void;
+  addProyecto: (data: Proyecto) => Promise<void>;
+  addDocumento: (data: DocumentoApp) => Promise<void>;
+  addEquipo: (data: EquipoApp) => Promise<void>;
+  addAcabado: (data: RegistroAcabado) => Promise<void>;
+  addContacto: (data: ContactoEmpresa) => Promise<void>;
+  addCotizacion: (data: Cotizacion) => Promise<void>;
+  addSeguimiento: (data: SeguimientoComercial) => Promise<void>;
   updateCliente: (id: string, data: Cliente) => void;
   updateVenta: (id: string, data: Venta) => void;
   updateCobro: (id: string, data: Cobro) => void;
@@ -614,31 +614,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addProyecto = async (data: Proyecto) => {
     const nuevo = { ...data, id: data.id || Date.now().toString() };
+    const previous = proyectos;
     setProyectos([...proyectos, nuevo]);
     try {
       await proyectosService.crear(nuevo);
     } catch (error) {
       console.log('Error al guardar proyecto en API:', error);
+      setProyectos(previous);
+      throw error;
     }
   };
 
   const addDocumento = async (data: DocumentoApp) => {
     const nuevo = { ...data, id: data.id || Date.now().toString() };
+    const previous = documentos;
     setDocumentos([...documentos, nuevo]);
     try {
       await documentosService.crear(nuevo);
     } catch (error) {
       console.log('Error al guardar documento en API:', error);
+      setDocumentos(previous);
+      throw error;
     }
   };
 
   const addEquipo = async (data: EquipoApp) => {
     const nuevo = { ...data, id: data.id || Date.now().toString() };
+    const previous = equipos;
     setEquipos([...equipos, nuevo]);
     try {
       await equiposService.crear(nuevo);
     } catch (error) {
       console.log('Error al guardar equipo en API:', error);
+      setEquipos(previous);
+      throw error;
     }
   };
 
@@ -677,41 +686,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addAcabado = async (data: RegistroAcabado) => {
     const nuevo = { ...data, id: data.id || Date.now().toString() };
+    const previous = acabado;
     setAcabado([nuevo, ...acabado]);
     try {
       await acabadoService.crear(nuevo);
     } catch (error) {
       console.log('Error al guardar acabado en API:', error);
+      setAcabado(previous);
+      throw error;
     }
   };
 
   const addContacto = async (data: ContactoEmpresa) => {
     const nuevo = { ...data, id: data.id || Date.now().toString() };
+    const previous = contactos;
     setContactos([nuevo, ...contactos]);
     try {
       await contactosService.crear(nuevo);
     } catch (error) {
       console.log('Error al guardar contacto en API:', error);
+      setContactos(previous);
+      throw error;
     }
   };
 
   const addCotizacion = async (data: Cotizacion) => {
     const nuevo = { ...data, id: data.id || Date.now().toString() };
+    const previous = cotizaciones;
     setCotizaciones([nuevo, ...cotizaciones]);
     try {
       await cotizacionesService.crear(nuevo);
     } catch (error) {
       console.log('Error al guardar cotizacion en API:', error);
+      setCotizaciones(previous);
+      throw error;
     }
   };
 
   const addSeguimiento = async (data: SeguimientoComercial) => {
     const nuevo = { ...data, id: data.id || Date.now().toString() };
+    const previous = seguimientos;
     setSeguimientos([nuevo, ...seguimientos]);
     try {
       await seguimientosService.crear(nuevo);
     } catch (error) {
       console.log('Error al guardar seguimiento en API:', error);
+      setSeguimientos(previous);
+      throw error;
     }
   };
 
@@ -731,6 +752,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
       if (previous) setProyectos(proyectos.map((p) => (p.id === id ? previous : p)));
+      throw error;
     }
   };
 
@@ -742,6 +764,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.log('Error al actualizar documento en API:', error);
       if (previous) setDocumentos(documentos.map((d) => (d.id === id ? previous : d)));
+      throw error;
     }
   };
 
@@ -753,6 +776,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.log('Error al actualizar equipo en API:', error);
       if (previous) setEquipos(equipos.map((e) => (e.id === id ? previous : e)));
+      throw error;
     }
   };
 
@@ -764,6 +788,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.log('Error al actualizar acabado en API:', error);
       if (previous) setAcabado(acabado.map((item) => (item.id === id ? previous : item)));
+      throw error;
     }
   };
 
@@ -775,6 +800,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.log('Error al actualizar contacto en API:', error);
       if (previous) setContactos(contactos.map((item) => (item.id === id ? previous : item)));
+      throw error;
     }
   };
 
@@ -786,6 +812,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.log('Error al actualizar cotizacion en API:', error);
       if (previous) setCotizaciones(cotizaciones.map((item) => (item.id === id ? previous : item)));
+      throw error;
     }
   };
 
@@ -797,6 +824,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.log('Error al actualizar seguimiento en API:', error);
       if (previous) setSeguimientos(seguimientos.map((item) => (item.id === id ? previous : item)));
+      throw error;
     }
   };
 
