@@ -5,7 +5,7 @@ function getDevApiUrl() {
 
 // API Base URL - En desarrollo usa el mismo host del navegador para no romper cookies.
 const API_BASE_URL = import.meta.env.VITE_API_URL || (
-  import.meta.env.DEV ? getDevApiUrl() : 'https://jaboncontrol-production.up.railway.app/api'
+  import.meta.env.DEV ? getDevApiUrl() : '/api'
 );
 
 async function parseResponse(response: Response, endpoint: string) {

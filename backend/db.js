@@ -290,11 +290,14 @@ async function ensureAdmin() {
   const admin = await get("SELECT * FROM usuarios WHERE usuario = 'admin'");
   if (admin) return;
 
-  if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
-    throw new Error('ADMIN_PASSWORD es obligatorio para crear admin en produccion');
+  const generatedPassword = process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD
+    ? crypto.randomBytes(12).toString('base64url')
+    : null;
+  const initialPassword = process.env.ADMIN_PASSWORD || generatedPassword || 'admin123';
+  if (generatedPassword) {
+    console.warn(`ADMIN_TEMP_PASSWORD=${generatedPassword}`);
+    console.warn('Configure ADMIN_PASSWORD fijo en Render despues de entrar y crear su usuario definitivo.');
   }
-
-  const initialPassword = process.env.ADMIN_PASSWORD || 'admin123';
   const hashedPass = bcrypt.hashSync(initialPassword, 10);
   await run(
     'INSERT INTO usuarios (id, nombre, usuario, password, rol, password_actualizado_en) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',

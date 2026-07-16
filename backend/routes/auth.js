@@ -3,11 +3,12 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 const dbModule = require('../db');
 const { v4: uuid } = require('uuid');
 
 // Secreto JWT configurable por ambiente; en produccion no se permite fallback.
-const JWT_SECRET = process.env.JWT_SECRET || 'jaboncontrol_secret_2026_cambiar_en_produccion';
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
 const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
 const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || 'jc_session';
 const PASSWORD_MAX_DAYS = Number(process.env.PASSWORD_MAX_DAYS || 180);
@@ -25,9 +26,8 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// En produccion el sistema debe arrancar solo con secreto real.
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET es obligatorio en produccion');
+  console.warn('JWT_SECRET no fue configurado. Se genero uno temporal para este arranque; configure uno fijo en Render para produccion.');
 }
 
 function isStrongPassword(password) {
