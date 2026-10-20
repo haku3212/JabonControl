@@ -12,6 +12,7 @@ import { Ventas } from './components/panels/Ventas';
 import { Cobros } from './components/panels/Cobros';
 import { Clientes } from './components/panels/Clientes';
 import { Finanzas } from './components/panels/Finanzas';
+import { ComprasGastos } from './components/panels/ComprasGastos';
 import { Proyectos } from './components/panels/Proyectos';
 import { Contactos } from './components/panels/Contactos';
 import { Documentacion } from './components/panels/Documentacion';
@@ -41,6 +42,7 @@ const panelTitles: Record<string, [string, string]> = {
   cobros: ['Cobros', 'COMERCIAL / COBROS'],
   clientes: ['Clientes', 'COMERCIAL / CLIENTES'],
   finanzas: ['Finanzas', 'FINANZAS / FLUJO DE CAJA'],
+  compras_gastos: ['Compras y Gastos', 'FINANZAS / EGRESOS'],
   proyectos: ['Proyectos', 'GESTIÓN / PROYECTOS'],
   contactos: ['Contactos', 'GESTIÓN / CONTACTOS'],
   documentacion: ['Documentación', 'GESTIÓN / DOCUMENTACIÓN'],
@@ -113,7 +115,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     if (modal) {
       setModalType(modal);
     } else {
-      showNotificationMsg(`ℹ️ El formulario para ${activePanel} aún no está disponible`);
+      showNotificationMsg(`El formulario para ${activePanel} aun no esta disponible.`);
     }
   };
 
@@ -126,9 +128,9 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     try {
       await addVenta(data);
       setModalType(null);
-      showNotificationMsg('✅ Venta registrada correctamente');
+      showNotificationMsg('Venta registrada correctamente.');
     } catch (error) {
-      showNotificationMsg('❌ Error al guardar la venta');
+      showNotificationMsg('Error al guardar la venta.');
     }
   };
 
@@ -136,9 +138,9 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     try {
       await addCliente(data);
       setModalType(null);
-      showNotificationMsg('✅ Cliente registrado correctamente');
+      showNotificationMsg('Cliente registrado correctamente.');
     } catch (error) {
-      showNotificationMsg('❌ Error al guardar el cliente');
+      showNotificationMsg('Error al guardar el cliente.');
     }
   };
 
@@ -146,9 +148,9 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     try {
       await addHornada(data);
       setModalType(null);
-      showNotificationMsg('✅ Hornada registrada correctamente');
+      showNotificationMsg('Hornada registrada correctamente.');
     } catch (error) {
-      showNotificationMsg('❌ Error al guardar la hornada');
+      showNotificationMsg('Error al guardar la hornada.');
     }
   };
 
@@ -156,9 +158,9 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     try {
       await addRecepcion(data);
       setModalType(null);
-      showNotificationMsg('✅ Recepción registrada correctamente');
+      showNotificationMsg('Recepcion registrada correctamente.');
     } catch (error) {
-      showNotificationMsg('❌ Error al guardar la recepción');
+      showNotificationMsg('Error al guardar la recepcion.');
     }
   };
 
@@ -176,9 +178,9 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
         numeroRecibo,
       });
 
-      showNotificationMsg('✅ Cobro registrado - Recibo generado');
+      showNotificationMsg('Cobro registrado. Recibo generado.');
     } catch (error) {
-      showNotificationMsg('❌ Error al guardar el cobro');
+      showNotificationMsg('Error al guardar el cobro.');
     }
   };
 
@@ -186,9 +188,9 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     try {
       await addProyecto({ progreso: 0, ...data });
       setModalType(null);
-      showNotificationMsg('✅ Proyecto registrado correctamente');
+      showNotificationMsg('Proyecto registrado correctamente.');
     } catch (error) {
-      showNotificationMsg('❌ Error al guardar el proyecto');
+      showNotificationMsg('Error al guardar el proyecto.');
     }
   };
 
@@ -196,9 +198,9 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     try {
       await addEquipo(data);
       setModalType(null);
-      showNotificationMsg('✅ Equipo registrado correctamente');
+      showNotificationMsg('Equipo registrado correctamente.');
     } catch (error) {
-      showNotificationMsg('❌ Error al guardar el equipo');
+      showNotificationMsg('Error al guardar el equipo.');
     }
   };
 
@@ -206,9 +208,9 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     try {
       await addDocumento(data);
       setModalType(null);
-      showNotificationMsg('✅ Documento guardado correctamente');
+      showNotificationMsg('Documento guardado correctamente.');
     } catch (error) {
-      showNotificationMsg('❌ Error al guardar el documento');
+      showNotificationMsg('Error al guardar el documento.');
     }
   };
 
@@ -217,7 +219,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
   const hasAccess = canAccessPanel(user.rol, activePanel);
 
   const panelComponents: Record<string, JSX.Element> = {
-    dashboard: <Dashboard />,
+    dashboard: <Dashboard onNavigate={handleNavigate} allowedPanels={visiblePanels(user.rol)} />,
     materias: <MateriasPrimas onNewClick={() => setModalType('recepcion')} />,
     hornadas: <Hornadas onNewClick={() => setModalType('hornada')} />,
     acabado: <Acabado />,
@@ -225,6 +227,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     cobros: <Cobros onNewClick={() => setModalType('cobro')} userRole={user.rol} />,
     clientes: <Clientes onNewClick={() => setModalType('cliente')} />,
     finanzas: <Finanzas />,
+    compras_gastos: <ComprasGastos />,
     proyectos: <Proyectos />,
     contactos: <Contactos />,
     documentacion: <Documentacion onNewClick={() => setModalType('documento')} />,
@@ -237,7 +240,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
   };
 
   return (
-    <div className="flex h-screen bg-dark-bg flex-col md:flex-row">
+    <div className="flex h-screen app-shell flex-col md:flex-row">
       {/* Sidebar - Mobile overlay */}
       {isMobile && sidebarOpen && (
         <div
@@ -253,7 +256,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
                 sidebarOpen ? 'translate-x-0' : '-translate-x-full'
               }`
             : 'static'
-        } w-56 md:w-56`}
+        } w-60 md:w-60`}
       >
         <Sidebar user={user} activePanel={activePanel} onNavigate={(panel) => {
           handleNavigate(panel);
@@ -276,7 +279,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
         {/* El padding baja en movil para aprovechar mejor el ancho disponible. */}
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
           {hasAccess ? (panelComponents[activePanel] || <Dashboard />) : (
-            <div className="bg-dark-surface border border-dark-border rounded-lg p-8 text-center text-text-secondary">
+            <div className="bg-dark-surface border border-dark-border rounded-md p-8 text-center text-text-secondary">
               No tienes permiso para ver este modulo.
             </div>
           )}
@@ -318,16 +321,16 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
       {/* Modal Recibo */}
       {reciboData && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-dark-surface border border-dark-border rounded-lg w-full max-w-2xl my-8">
+          <div className="bg-dark-surface border border-dark-border rounded-md w-full max-w-2xl my-8 shadow-[0_24px_80px_rgba(16,24,40,0.16)]">
             <div className="px-5 py-4 border-b border-dark-border flex items-center justify-between sticky top-0 bg-dark-surface z-10">
-              <h2 className="text-xl font-bebas text-text-primary tracking-wider">
+              <h2 className="text-lg font-semibold text-text-primary">
                 Recibo de Pago
               </h2>
               <button
                 onClick={() => setReciboData(null)}
                 className="text-text-tertiary hover:text-text-primary text-xl w-8 h-8 flex items-center justify-center rounded hover:bg-dark-surface2 transition-colors"
               >
-                ✕
+                x
               </button>
             </div>
             <div className="p-5 overflow-y-auto max-h-[calc(100vh-200px)]">
@@ -414,7 +417,7 @@ export function App() {
 
   if (checkingSession) {
     return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center text-text-secondary text-sm">
+      <div className="min-h-screen app-shell flex items-center justify-center text-text-secondary text-sm">
         Verificando sesion...
       </div>
     );

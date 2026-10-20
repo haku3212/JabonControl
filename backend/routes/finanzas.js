@@ -31,6 +31,9 @@ router.get('/movimientos', async (req, res) => {
 
 router.post('/movimientos', async (req, res) => {
   try {
+    if (!['ingreso', 'egreso'].includes(req.body.tipo) || !Number.isFinite(Number(req.body.monto)) || Number(req.body.monto) <= 0 || !String(req.body.concepto || '').trim()) {
+      return res.status(400).json({ error: 'Tipo, concepto y monto positivo son obligatorios.' });
+    }
     const data = normalizeMovement(req.body);
     if (!data.concepto || !data.monto) {
       return res.status(400).json({ error: 'Concepto y monto son obligatorios' });

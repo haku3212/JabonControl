@@ -45,6 +45,12 @@ router.put('/:id', requireRoles('admin', 'supervisor', 'supervisor_ventas'), asy
     const previous = await dbModule.get('SELECT * FROM clientes WHERE id = ?', [req.params.id]);
     if (!previous) return res.status(404).json({ error: 'Cliente no encontrado' });
 
+    if (!nombre?.trim() || !tipo?.trim()) return res.status(400).json({ error: 'Nombre y tipo son obligatorios.' });
+    if (nombre !== previous.nombre) {
+      const linked = await dbModule.get('SELECT id FROM ventas WHERE cliente = ? UNION ALL SELECT id FROM cobros WHERE cliente = ? LIMIT 1', [previous.nombre, previous.nombre]);
+      if (linked) return res.status(409).json({ error: 'Este cliente tiene movimientos asociados. Conserve su nombre para mantener el historial conectado.' });
+    }
+
     await dbModule.run(
       'UPDATE clientes SET nombre = ?, tipo = ?, telefono = ?, email = ?, ciudad = ?, direccion = ? WHERE id = ?',
       [nombre, tipo, telefono, email, ciudad, direccion, req.params.id]
@@ -61,6 +67,9 @@ router.delete('/:id', requireRoles('admin'), async (req, res) => {
   try {
     const previous = await dbModule.get('SELECT * FROM clientes WHERE id = ?', [req.params.id]);
     if (!previous) return res.status(404).json({ error: 'Cliente no encontrado' });
+
+    const linked = await dbModule.get('SELECT id FROM ventas WHERE cliente = ? UNION ALL SELECT id FROM cobros WHERE cliente = ? LIMIT 1', [previous.nombre, previous.nombre]);
+    if (linked) return res.status(409).json({ error: 'No se puede eliminar un cliente con ventas o cobros asociados.' });
 
     await dbModule.run('DELETE FROM clientes WHERE id = ?', [req.params.id]);
     await dbModule.save();

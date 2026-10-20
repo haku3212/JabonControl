@@ -49,7 +49,7 @@ function isLocalDevelopmentOrigin(origin) {
 function isRenderOrigin(origin) {
   try {
     const url = new URL(origin);
-    return process.env.NODE_ENV === 'production' && url.protocol === 'https:' && url.hostname.endsWith('.onrender.com');
+    return process.env.NODE_ENV === 'production' && url.origin === process.env.RENDER_EXTERNAL_URL;
   } catch {
     return false;
   }
@@ -104,8 +104,13 @@ app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  try {
+    await dbModule.get('SELECT 1 AS ok');
+    res.json({ status: 'OK', storage: dbModule.isPostgres() ? 'postgresql' : 'sqlite', timestamp: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ status: 'unavailable' });
+  }
 });
 
 // Rutas
@@ -113,8 +118,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/ventas', verifyToken, ventasRoutes);
 app.use('/api/cobros', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), cobrosRoutes);
 app.use('/api/clientes', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas', 'operario'), clientesRoutes);
-app.use('/api/hornadas', verifyToken, requireRoles('admin', 'operario'), hornadasRoutes);
-app.use('/api/materias', verifyToken, requireRoles('admin', 'operario'), materiasRoutes);
+app.use('/api/hornadas', verifyToken, requireRoles('admin', 'supervisor', 'operario'), hornadasRoutes);
+app.use('/api/materias', verifyToken, requireRoles('admin', 'supervisor', 'operario'), materiasRoutes);
 app.use('/api/finanzas', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), finanzasRoutes);
 app.use('/api/cotizaciones', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), createAppRecordsRouter('cotizaciones'));
 app.use('/api/seguimientos', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), createAppRecordsRouter('seguimientos'));
@@ -134,7 +139,7 @@ app.get('/api/auditoria', verifyToken, requireAdmin, async (req, res) => {
 });
 app.get('/api/auditoria/integridad', verifyToken, requireAdmin, async (req, res) => {
   try {
-    const rows = await dbModule.all('SELECT * FROM audit_logs ORDER BY creado_en ASC');
+    const rows = await dbModule.all('SELECT * FROM audit_logs ORDER BY COALESCE(secuencia, 0) ASC, creado_en ASC, id ASC');
     if (rows.length === 0) return res.json({ ok: true, total: 0, errores: [] });
     let previousHash = '';
     const errores = [];

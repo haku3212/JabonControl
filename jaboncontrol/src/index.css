@@ -10,6 +10,7 @@
 
 body {
   @apply bg-dark-bg text-text-primary font-sans overflow-hidden;
+  letter-spacing: 0;
 }
 
 html, body, #root {
@@ -31,6 +32,33 @@ html, body, #root {
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-text-tertiary;
+}
+
+.app-shell {
+  background: #f3f5f4;
+}
+
+@layer components {
+  .action-primary { @apply rounded-md bg-accent-blue px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50; }
+  .action-secondary { @apply rounded-md border border-dark-border bg-white px-4 py-2 text-sm font-medium text-text-secondary hover:bg-dark-surface3; }
+}
+
+button { cursor: pointer; transition: background-color 140ms, border-color 140ms; }
+button:disabled { cursor: not-allowed; }
+button:focus-visible, a:focus-visible { outline: 2px solid #176753; outline-offset: 3px; }
+.bg-accent-yellow.text-black { color: white; }
+.font-bebas { font-weight: 600; }
+* { letter-spacing: 0 !important; }
+table th { white-space: nowrap; }
+table td { vertical-align: middle; }
+main > div { min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-accent-blue focus:ring-offset-2 focus:ring-offset-dark-bg;
 }
 
 @keyframes fadeIn {
@@ -70,7 +98,7 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.14);
+  box-shadow: 0 0 0 3px rgba(49, 95, 114, 0.15);
 }
 
 /* Mantiene las tablas legibles en pantallas pequenas sin romper el layout. */

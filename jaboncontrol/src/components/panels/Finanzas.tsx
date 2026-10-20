@@ -39,6 +39,8 @@ const emptyForm: MovimientoFinanciero = {
 const money = (value: number) => `Bs ${Math.round(value).toLocaleString('es-BO')}`;
 
 const origenLabel = (origen = 'manual') => {
+  if (origen === 'sistema-venta') return 'Ventas';
+  if (origen === 'compras-gastos') return 'Compras/Gastos';
   if (origen === 'sistema-cobro') return 'Cobros';
   if (origen === 'sistema-compra') return 'Compras';
   if (origen === 'csv' || origen === 'excel') return 'CSV';
@@ -127,7 +129,7 @@ const classifyRow = (row: Record<string, any>): MovimientoFinanciero => {
 };
 
 export function Finanzas() {
-  const { ventas, cobros, recepciones } = useAppContext();
+  const { ventas, cobros } = useAppContext();
   const [movimientos, setMovimientos] = useState<MovimientoFinanciero[]>([]);
   const [form, setForm] = useState<MovimientoFinanciero>(emptyForm);
   const [preview, setPreview] = useState<MovimientoFinanciero[]>([]);
@@ -167,51 +169,34 @@ export function Finanzas() {
       notas: 'Generado automaticamente desde el modulo Cobros',
     }));
 
-    const egresosCompras = recepciones
-      .filter((recepcion) => recepcion.estado !== 'cancelado')
-      .map((recepcion) => ({
-        id: `sistema-recepcion-${recepcion.id}`,
-        fecha: recepcion.fecha,
-        tipo: 'egreso' as const,
-        categoria: 'Materia prima',
-        concepto: `Compra ${recepcion.producto}`,
-        tercero: recepcion.proveedor,
-        metodoPago: '',
-        referencia: recepcion.id,
-        monto: Number(recepcion.precioTotal || 0),
-        origen: 'sistema-compra',
-        notas: 'Generado automaticamente desde Materias Primas',
-      }));
-
-    return [...ingresosCobros, ...egresosCompras];
-  }, [cobros, recepciones]);
+    const ingresosContado = ventas.filter((venta) => venta.tipoPago !== 'credito').map((venta) => ({
+      id: `sistema-venta-${venta.id}`, fecha: venta.fecha, tipo: 'ingreso' as const,
+      categoria: 'Ventas', concepto: `Venta ${venta.numeroNE}`, tercero: venta.cliente,
+      metodoPago: venta.metodoPago || '', referencia: venta.numeroNE,
+      monto: Number(venta.total ?? venta.precioTotal ?? 0), origen: 'sistema-venta', notas: venta.observaciones || '',
+    }));
+    return [...ingresosCobros, ...ingresosContado];
+  }, [cobros, ventas]);
 
   const isDuplicadoOperativo = (movimiento: MovimientoFinanciero) => {
-    const categoria = normalizeKey(movimiento.categoria || '');
-    const concepto = normalizeKey(movimiento.concepto || '');
-    return (
-      categoria.includes('cobro') ||
-      categoria.includes('venta') ||
-      categoria.includes('materiaprima') ||
-      concepto.includes('cobrone') ||
-      concepto.includes('compranaoh')
+    return movimiento.tipo === 'ingreso' && Boolean(movimiento.referencia) && movimientosSistema.some((item) =>
+      item.referencia === movimiento.referencia && item.fecha === movimiento.fecha && Number(item.monto) === Number(movimiento.monto)
     );
   };
 
   const movimientosAjuste = useMemo(
     () => movimientos.filter((movimiento) => !isDuplicadoOperativo(movimiento)),
-    [movimientos]
+    [movimientos, movimientosSistema]
   );
 
   const resumen = useMemo(() => {
     const ingresosVentas = ventas.reduce((sum, venta) => sum + (venta.total || venta.precioTotal || 0), 0);
-    const cobrado = cobros.reduce((sum, cobro) => sum + cobro.montoCobrado, 0);
+    const cobrado = movimientosSistema.reduce((sum, item) => sum + Number(item.monto), 0);
     const porCobrar = ventas.reduce((sum, venta) => sum + ventaSaldoPendiente(venta), 0);
     const ingresosExtra = movimientosAjuste.filter((m) => m.tipo === 'ingreso').reduce((sum, item) => sum + Number(item.monto || 0), 0);
     const egresosExtra = movimientosAjuste.filter((m) => m.tipo === 'egreso').reduce((sum, item) => sum + Number(item.monto || 0), 0);
-    const comprasSistema = recepciones.filter((item) => item.estado !== 'cancelado').reduce((sum, item) => sum + Number(item.precioTotal || 0), 0);
     const ingresosTotales = ingresosVentas + ingresosExtra;
-    const egresos = comprasSistema + egresosExtra;
+    const egresos = egresosExtra;
 
     return {
       ingresosTotales,
@@ -221,11 +206,11 @@ export function Finanzas() {
       utilidad: ingresosTotales - egresos,
       flujoCaja: cobrado + ingresosExtra - egresos,
     };
-  }, [ventas, cobros, recepciones, movimientosAjuste]);
+  }, [ventas, movimientosSistema, movimientosAjuste]);
 
   const libroFinanciero = useMemo(
-    () => [...movimientosSistema, ...movimientos].sort((a, b) => `${b.fecha}${b.id || ''}`.localeCompare(`${a.fecha}${a.id || ''}`)),
-    [movimientosSistema, movimientos]
+    () => [...movimientosSistema, ...movimientosAjuste].sort((a, b) => `${b.fecha}${b.id || ''}`.localeCompare(`${a.fecha}${a.id || ''}`)),
+    [movimientosSistema, movimientosAjuste]
   );
   const filteredMovimientos = filter === 'todos' ? libroFinanciero : libroFinanciero.filter((item) => item.tipo === filter);
 
@@ -393,7 +378,7 @@ export function Finanzas() {
           ))}
         </div>
         <p className="mb-4 text-xs text-text-tertiary">
-          Cobros y compras se generan automaticamente desde sus modulos. Los registros manuales/importados sirven para gastos extra, banco y ajustes.
+          Ventas al contado y cobros alimentan los ingresos. Compras/Gastos comparte los egresos de este libro.
         </p>
         {loading ? <div className="py-8 text-center text-text-tertiary text-sm">Cargando movimientos...</div> : <MovimientosTable data={filteredMovimientos} onDelete={remove} />}
       </Card>

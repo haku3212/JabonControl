@@ -20,7 +20,7 @@ const money = (value: number) => `Bs ${Math.round(value || 0).toLocaleString('es
 
 export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) {
   // Incluimos deleteVenta para poder eliminar notas con confirmacion.
-  const { ventas, kpis, deleteVenta, updateVenta } = useAppContext();
+  const { ventas, deleteVenta, updateVenta } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPago, setFilterPago] = useState('todos');
   const [dateRange, setDateRange] = useState(defaultDateRange());
@@ -39,8 +39,9 @@ export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) 
   const totalPeriodo = filteredVentas.reduce((sum, v) => sum + (v.total || v.precioTotal || 0), 0);
   const contado = filteredVentas.filter((v) => ventaSaldoPendiente(v) <= 0);
   const credito = filteredVentas.filter((v) => ventaSaldoPendiente(v) > 0);
+  const pendientesRecojo = filteredVentas.filter((v) => v.estadoEntrega === 'pendiente_recojo');
   // Borrado seguro: exige confirmacion antes de tocar datos.
-  const safeDelete = (venta: any) => {
+  const safeDelete = async (venta: any) => {
     // El mensaje incluye numero y cliente para evitar borrar la nota equivocada.
     const ok = confirm(`Eliminar la nota ${venta.numeroNE} de ${venta.cliente}?`);
 
@@ -48,7 +49,12 @@ export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) 
     if (!ok) return;
 
     // Si confirma, delegamos en el contexto para borrar local/API.
-    deleteVenta(venta.id);
+    try {
+      await deleteVenta(venta.id);
+    } catch (error) {
+      alert('No se pudo eliminar la venta. Revise su conexion o permisos.');
+      console.error(error);
+    }
   };
 
   return (
@@ -65,9 +71,9 @@ export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) 
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <KPICard label="Periodo filtrado" value={money(totalPeriodo)} unit={`${filteredVentas.length} notas`} color="yellow" />
-        <KPICard label="Credito pendiente" value={money(kpis.cobrosPendientes)} unit={`${credito.length} notas`} color="orange" />
+        <KPICard label="Credito pendiente" value={money(credito.reduce((s, v) => s + ventaSaldoPendiente(v), 0))} unit={`${credito.length} notas`} color="orange" />
         <KPICard label="Cancelado" value={money(contado.reduce((s, v) => s + (v.total || v.precioTotal || 0), 0))} unit={`${contado.length} notas`} color="blue" />
-        <KPICard label="Inventario disponible" value={kpis.inventarioDisponible.toLocaleString('es-BO')} unit="unidades terminadas" color="green" />
+        <KPICard label="Pendiente recojo" value={pendientesRecojo.length} unit="ventas pagadas/reservadas" color="green" />
       </div>
 
       <Card title="Notas de entrega" badge={{ label: `${filteredVentas.length} registros`, type: 'info' }}>
@@ -91,7 +97,7 @@ export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) 
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-dark-border">
-                {['N NE', 'Fecha', 'Cliente', 'Formato', 'Cantidad', 'Pastas/caja', 'P. Unitario', 'Total', 'Tipo pago', ''].map((h) => (
+                {['N NE', 'Fecha', 'Cliente', 'Formato', 'Total', 'Pago', 'Entrega', 'Detalle', ''].map((h) => (
                   <th key={h} className="text-left px-3 py-2 text-xs font-mono text-text-tertiary uppercase">{h}</th>
                 ))}
               </tr>
@@ -103,15 +109,25 @@ export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) 
                   <td className="px-3 py-2 font-mono text-text-secondary">{venta.fecha}</td>
                   <td className="px-3 py-2 text-text-secondary">{venta.cliente}</td>
                   <td className="px-3 py-2 text-text-secondary">{venta.formato}</td>
-                  <td className="px-3 py-2 font-mono text-text-secondary">{venta.cantidad}</td>
-                  <td className="px-3 py-2 font-mono text-text-secondary">{venta.formato?.toLowerCase().includes('caja') ? (venta.unidadesPorCaja || 50) : '-'}</td>
-                  <td className="px-3 py-2 font-mono text-text-secondary">{money(venta.precioUnitario)}</td>
                   <td className="px-3 py-2 font-mono text-accent-yellow">{money(venta.total || venta.precioTotal || 0)}</td>
                   <td className="px-3 py-2">
+                    <div className="space-y-1">
+                      <Badge
+                        label={ventaSaldoPendiente(venta) <= 0 ? 'Pagado' : 'Credito'}
+                        type={ventaSaldoPendiente(venta) <= 0 ? 'success' : 'warning'}
+                      />
+                      <div className="text-[11px] text-text-tertiary">{venta.metodoPago || '-'}</div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">
                     <Badge
-                      label={ventaSaldoPendiente(venta) <= 0 ? 'Pagado' : 'Credito'}
-                      type={ventaSaldoPendiente(venta) <= 0 ? 'success' : 'warning'}
+                      label={venta.estadoEntrega === 'pendiente_recojo' ? 'Pendiente recojo' : 'Entregado'}
+                      type={venta.estadoEntrega === 'pendiente_recojo' ? 'warning' : 'success'}
                     />
+                    {venta.fechaRecojo && <div className="text-[11px] text-text-tertiary mt-1">{venta.fechaRecojo}</div>}
+                  </td>
+                  <td className="px-3 py-2 max-w-[220px] text-xs text-text-tertiary">
+                    <div className="line-clamp-2">{venta.observaciones || venta.cuentaEmpresa || '-'}</div>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex gap-2">

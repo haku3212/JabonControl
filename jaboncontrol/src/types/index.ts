@@ -40,7 +40,15 @@ export interface Venta {
   unidadesPorCaja?: number;
   precioUnitario: number;
   precioTotal: number;
-  tipoPago: 'cancelado' | 'credito';
+  total?: number;
+  tipoPago: 'contado' | 'credito' | 'transferencia';
+  metodoPago?: 'efectivo' | 'transferencia' | 'cheque' | 'deposito' | string;
+  cuentaEmpresa?: string;
+  estadoEntrega?: 'entregado' | 'pendiente_recojo';
+  fechaRecojo?: string;
+  observaciones?: string;
+  estado?: 'pagado' | 'pendiente' | 'parcial';
+  saldoPendiente?: number;
 }
 
 export interface Cobro {

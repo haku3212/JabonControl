@@ -11,32 +11,32 @@ interface CardProps {
 }
 
 const badgeColors = {
-  success: 'bg-status-success bg-opacity-10 text-status-success',
-  warning: 'bg-accent-yellow bg-opacity-10 text-accent-yellow',
-  danger: 'bg-status-danger bg-opacity-10 text-status-danger',
-  info: 'bg-accent-blue bg-opacity-10 text-accent-blue',
-  neutral: 'bg-dark-surface3 text-text-tertiary',
+  success: 'bg-[#eef6f0] text-status-success border-[#cfe3d4]',
+  warning: 'bg-[#f8f3df] text-status-warning border-[#e6d9a3]',
+  danger: 'bg-[#f8eeec] text-status-danger border-[#e2c3be]',
+  info: 'bg-[#edf3f5] text-accent-blue border-[#c9dbe2]',
+  neutral: 'bg-dark-surface3 text-text-secondary border-dark-border',
 };
 
 export function Card({ title, children, action, badge }: CardProps) {
   return (
-    <div className="bg-dark-surface border border-dark-border rounded-lg overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.16)]">
-      <div className="px-5 py-3.5 border-b border-dark-border flex items-center justify-between bg-dark-surface2 bg-opacity-40">
-        <div className="text-xs font-mono text-text-secondary uppercase tracking-widest">
+    <section className="bg-dark-surface border border-dark-border rounded-md overflow-hidden shadow-[0_1px_3px_rgba(36,35,33,0.04)]">
+      <div className="px-4 py-3 border-b border-dark-border flex items-center justify-between bg-white">
+        <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
           {title}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {badge && (
-            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-mono font-semibold ${badgeColors[badge.type]}`}>
-              ● {badge.label}
+            <span className={`inline-flex items-center px-2 py-1 rounded border text-xs font-medium ${badgeColors[badge.type]}`}>
+              {badge.label}
             </span>
           )}
           {action}
         </div>
       </div>
-      <div className="p-5">
+      <div className="p-4">
         {children}
       </div>
-    </div>
+    </section>
   );
 }

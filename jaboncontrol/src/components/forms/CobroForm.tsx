@@ -108,6 +108,11 @@ export function CobroForm({ onSave, onCancel }: CobroFormProps) {
       return;
     }
 
+    if (excedente > 0) {
+      alert(`El cobro excede la deuda pendiente por Bs ${excedente.toLocaleString('es-BO')}.`);
+      return;
+    }
+
     // Activamos loading para bloquear doble click.
     setLoading(true);
 

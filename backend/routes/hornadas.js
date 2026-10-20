@@ -5,6 +5,26 @@ const { v4: uuid } = require('uuid');
 const { logAudit } = require('../db');
 const { requireRoles } = require('./auth');
 
+function normalizeHornada(body) {
+  const ingredientes = body.ingredientes || {};
+  return {
+    numero: body.numero,
+    fecha: body.fecha,
+    horaInicio: body.horaInicio,
+    operario: body.operario,
+    naohVolumen: Number(body.naohVolumen ?? ingredientes.naohVolumen ?? 0),
+    seboFund: Number(body.seboFund ?? ingredientes.seboFund ?? 0),
+    aceiteQuem: Number(body.aceiteQuem ?? ingredientes.aceiteQuem ?? 0),
+    aceiteCrudo: Number(body.aceiteCrudo ?? ingredientes.aceiteCrudo ?? 0),
+    aceiteAlmendra: Number(body.aceiteAlmendra ?? ingredientes.aceiteAlmendra ?? 0),
+    agua: Number(body.agua ?? ingredientes.agua ?? 0),
+    jabonRecicl: Number(body.jabonRecicl ?? ingredientes.jabonRecicl ?? 0),
+    produccionTotal: Number(body.produccionTotal ?? 0),
+    rendimiento: Number(body.rendimiento ?? 0),
+    observaciones: body.observaciones || '',
+  };
+}
+
 router.get('/', async (req, res) => {
   try {
     const rows = await dbModule.all('SELECT * FROM hornadas ORDER BY fecha DESC');
@@ -16,7 +36,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { numero, fecha, horaInicio, operario, naohVolumen, seboFund, aceiteQuem, aceiteCrudo, aceiteAlmendra, agua, jabonRecicl, produccionTotal, rendimiento, observaciones } = req.body;
+    const { numero, fecha, horaInicio, operario, naohVolumen, seboFund, aceiteQuem, aceiteCrudo, aceiteAlmendra, agua, jabonRecicl, produccionTotal, rendimiento, observaciones } = normalizeHornada(req.body);
     if (!numero || !fecha || !produccionTotal) {
       return res.status(400).json({ error: 'Campos requeridos' });
     }

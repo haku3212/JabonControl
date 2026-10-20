@@ -42,6 +42,11 @@ export interface Venta {
   total?: number;
   tipoPago: 'credito' | 'contado' | 'transferencia' | 'cancelado';
   precioTotal?: number; // For backward compatibility
+  metodoPago?: 'efectivo' | 'transferencia' | 'cheque' | 'deposito' | string;
+  cuentaEmpresa?: string;
+  estadoEntrega?: 'entregado' | 'pendiente_recojo';
+  fechaRecojo?: string;
+  observaciones?: string;
   saldoPendiente?: number; // Lo que el cliente aún debe de esta venta
   estado?: string; // 'pendiente' | 'parcial' | 'pagado'
 }

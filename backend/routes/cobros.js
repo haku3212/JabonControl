@@ -36,6 +36,21 @@ async function recalcularSaldosCliente(cliente) {
   }
 }
 
+async function totalDeudaCliente(cliente, cobroIdIgnorado = null) {
+  const ventas = await dbModule.all(
+    'SELECT total, tipoPago FROM ventas WHERE cliente = ?',
+    [cliente]
+  );
+  const cobros = cobroIdIgnorado
+    ? await dbModule.all('SELECT id, montoCobrado FROM cobros WHERE cliente = ? AND id <> ?', [cliente, cobroIdIgnorado])
+    : await dbModule.all('SELECT id, montoCobrado FROM cobros WHERE cliente = ?', [cliente]);
+  const totalCredito = ventas.reduce((sum, venta) => (
+    sum + (venta.tipoPago === 'credito' ? Number(venta.total || 0) : 0)
+  ), 0);
+  const totalCobrado = cobros.reduce((sum, cobro) => sum + Number(cobro.montoCobrado || 0), 0);
+  return Math.max(0, Math.round((totalCredito - totalCobrado) * 100) / 100);
+}
+
 router.get('/', async (req, res) => {
   try {
     const rows = await dbModule.all('SELECT * FROM cobros ORDER BY fecha DESC');
@@ -48,21 +63,26 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { fecha, cliente, montoCobrado, metodoPago, notasCorrespondientes } = req.body;
-    if (!cliente || !montoCobrado) {
+    const monto = Number(montoCobrado);
+    if (!cliente || !Number.isFinite(monto) || monto <= 0 || !['efectivo', 'transferencia', 'deposito', 'cheque'].includes(metodoPago)) {
       return res.status(400).json({ error: 'Campos requeridos' });
+    }
+    const deuda = await totalDeudaCliente(cliente);
+    if (monto > deuda) {
+      return res.status(400).json({ error: `El cobro excede la deuda pendiente. Deuda actual: ${deuda}.` });
     }
 
     const id = uuid();
     await dbModule.run(
       `INSERT INTO cobros (id, fecha, cliente, montoCobrado, metodoPago, notasCorrespondientes)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, fecha || new Date().toISOString().split('T')[0], cliente, montoCobrado, metodoPago, notasCorrespondientes]
+      [id, fecha || new Date().toISOString().split('T')[0], cliente, monto, metodoPago, notasCorrespondientes]
     );
 
     await recalcularSaldosCliente(cliente);
 
     await dbModule.save();
-    await logAudit(req, 'crear', 'cobros', id, null, req.body, `Cobro de ${montoCobrado} registrado para ${cliente}`);
+    await logAudit(req, 'crear', 'cobros', id, null, { ...req.body, montoCobrado: monto }, `Cobro de ${monto} registrado para ${cliente}`);
 
     res.status(201).json({ id, message: 'Cobro registrado' });
   } catch (error) {
@@ -83,8 +103,12 @@ router.put('/:id', requireRoles('admin', 'supervisor', 'supervisor_ventas', 'fin
       notasCorrespondientes: req.body.notasCorrespondientes ?? previous.notasCorrespondientes,
     };
 
-    if (!data.cliente || data.montoCobrado <= 0) {
+    if (!data.cliente || !Number.isFinite(data.montoCobrado) || data.montoCobrado <= 0 || !['efectivo', 'transferencia', 'deposito', 'cheque'].includes(data.metodoPago)) {
       return res.status(400).json({ error: 'Cliente y monto son obligatorios' });
+    }
+    const deuda = await totalDeudaCliente(data.cliente, req.params.id);
+    if (data.montoCobrado > deuda) {
+      return res.status(400).json({ error: `El cobro excede la deuda pendiente. Deuda actual: ${deuda}.` });
     }
 
     await dbModule.run(

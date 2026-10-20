@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
-import { UNIDADES_POR_CAJA, unitsForSale } from '../../utils/inventory';
+import { UNIDADES_POR_CAJA } from '../../utils/inventory';
+import { ventasService } from '../../services/api';
 
 interface VentaFormProps {
   onSave: (data: any) => Promise<void>;
@@ -9,10 +10,10 @@ interface VentaFormProps {
 }
 
 export function VentaForm({ onSave, onCancel, initialData }: VentaFormProps) {
-  const { clientes, kpis } = useAppContext();
+  const { clientes } = useAppContext();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    numeroNE: initialData?.numeroNE || `NE-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
+    numeroNE: initialData?.numeroNE || '',
     fecha: initialData?.fecha || new Date().toISOString().split('T')[0],
     cliente: initialData?.cliente || '',
     formato: initialData?.formato || 'Cajas',
@@ -20,14 +21,22 @@ export function VentaForm({ onSave, onCancel, initialData }: VentaFormProps) {
     unidadesPorCaja: Number(initialData?.unidadesPorCaja || UNIDADES_POR_CAJA),
     precioUnitario: Number(initialData?.precioUnitario || 0),
     tipoPago: (initialData?.tipoPago || 'contado') as 'contado' | 'credito',
+    metodoPago: initialData?.metodoPago || 'efectivo',
+    cuentaEmpresa: initialData?.cuentaEmpresa || '',
+    estadoEntrega: initialData?.estadoEntrega || 'entregado',
+    fechaRecojo: initialData?.fechaRecojo || '',
+    observaciones: initialData?.observaciones || '',
   });
 
   const total = form.cantidad * form.precioUnitario;
   const esCaja = form.formato.toLowerCase().includes('caja');
-  const unidadesSolicitadas = unitsForSale(form.formato, form.cantidad, form.unidadesPorCaja);
-  const unidadesOriginales = initialData ? unitsForSale(initialData.formato, Number(initialData.cantidad || 0), Number(initialData.unidadesPorCaja || UNIDADES_POR_CAJA)) : 0;
-  const stockDisponible = kpis.inventarioDisponible + unidadesOriginales;
-  const excedeStock = unidadesSolicitadas > stockDisponible;
+
+  useEffect(() => {
+    if (initialData?.numeroNE) return;
+    ventasService.siguienteNumero()
+      .then((response) => response.numeroNE && setForm((current) => ({ ...current, numeroNE: response.numeroNE })))
+      .catch(() => setForm((current) => ({ ...current, numeroNE: current.numeroNE || `NE-${Date.now().toString().slice(-4)}` })));
+  }, [initialData?.numeroNE]);
 
   const handleSubmit = async () => {
     if (!form.cliente || form.cantidad <= 0 || form.precioUnitario <= 0) {
@@ -38,11 +47,6 @@ export function VentaForm({ onSave, onCancel, initialData }: VentaFormProps) {
       alert('Indique cuantas pastas trae cada caja.');
       return;
     }
-    if (excedeStock) {
-      alert(`Stock insuficiente. Disponible: ${stockDisponible.toLocaleString('es-BO')} unidades. Esta venta requiere ${unidadesSolicitadas.toLocaleString('es-BO')} unidades.`);
-      return;
-    }
-
     setLoading(true);
     try {
       await onSave({
@@ -167,6 +171,50 @@ export function VentaForm({ onSave, onCancel, initialData }: VentaFormProps) {
           </select>
         </div>
         <div>
+          <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Metodo de pago</label>
+          <select
+            value={form.metodoPago}
+            onChange={(e) => setForm({ ...form, metodoPago: e.target.value })}
+            className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+          >
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="deposito">Deposito</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Cuenta empresa</label>
+          <input
+            value={form.cuentaEmpresa}
+            onChange={(e) => setForm({ ...form, cuentaEmpresa: e.target.value })}
+            placeholder="Banco y cuenta de la empresa"
+            className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Entrega / recojo</label>
+          <select
+            value={form.estadoEntrega}
+            onChange={(e) => setForm({ ...form, estadoEntrega: e.target.value })}
+            className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+          >
+            <option value="entregado">Entregado ahora</option>
+            <option value="pendiente_recojo">Pago adelantado / recojo pendiente</option>
+          </select>
+        </div>
+        {form.estadoEntrega === 'pendiente_recojo' && (
+          <div>
+            <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Fecha estimada de recojo</label>
+            <input
+              type="date"
+              value={form.fechaRecojo}
+              onChange={(e) => setForm({ ...form, fechaRecojo: e.target.value })}
+              className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+            />
+          </div>
+        )}
+        <div>
           <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Total (Auto)</label>
           <input
             type="text"
@@ -175,16 +223,16 @@ export function VentaForm({ onSave, onCancel, initialData }: VentaFormProps) {
             className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-accent-yellow text-sm font-semibold outline-none"
           />
         </div>
-      </div>
-
-      <div className={`rounded border px-4 py-3 text-sm ${excedeStock ? 'border-status-danger bg-status-danger bg-opacity-10 text-status-danger' : 'border-dark-border bg-dark-surface2 text-text-secondary'}`}>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-          <span>Inventario disponible: <strong>{stockDisponible.toLocaleString('es-BO')}</strong> unidades</span>
-          <span>Esta venta descuenta: <strong>{unidadesSolicitadas.toLocaleString('es-BO')}</strong> unidades</span>
+        <div className="sm:col-span-2">
+          <label className="text-xs font-mono text-text-tertiary uppercase block mb-1">Observaciones / detalles de la nota</label>
+          <textarea
+            value={form.observaciones}
+            onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
+            placeholder="Ej: cliente paga por adelantado y recoge el viernes; entregar con factura; contacto de recojo..."
+            rows={3}
+            className="w-full bg-dark-surface2 border border-dark-border rounded px-3 py-2 text-text-primary text-sm focus:border-accent-yellow outline-none"
+          />
         </div>
-        {excedeStock && (
-          <p className="text-xs mt-2">No puedes registrar esta venta porque supera el stock terminado disponible.</p>
-        )}
       </div>
 
       <div className="bg-dark-surface2 p-4 rounded flex justify-end items-center gap-4 mt-4">
@@ -202,7 +250,7 @@ export function VentaForm({ onSave, onCancel, initialData }: VentaFormProps) {
         </button>
         <button
           onClick={handleSubmit}
-          disabled={loading || excedeStock}
+          disabled={loading}
           className="px-4 py-2 bg-accent-yellow text-black text-sm font-medium rounded hover:bg-opacity-90 disabled:opacity-50"
         >
           {loading ? 'Guardando...' : initialData ? 'Guardar cambios' : 'Guardar Venta'}

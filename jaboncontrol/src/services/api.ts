@@ -62,6 +62,9 @@ export const ventasService = {
   async listar() {
     return apiClient.get('/ventas');
   },
+  async siguienteNumero() {
+    return apiClient.get('/ventas/siguiente-numero');
+  },
   async crear(data: any) {
     return apiClient.post('/ventas', data);
   },

@@ -1,19 +1,21 @@
 export type UserRole = 'admin' | 'supervisor' | 'supervisor_ventas' | 'finanzas' | 'operario' | string;
 
+const corePanels = ['dashboard', 'ventas', 'cobros', 'finanzas', 'compras_gastos', 'clientes'];
+
 const roleAccess: Record<string, string[]> = {
-  admin: ['dashboard', 'materias', 'hornadas', 'acabado', 'ventas', 'cobros', 'clientes', 'finanzas', 'proyectos', 'contactos', 'documentacion', 'equipos', 'reportes', 'usuarios', 'auditoria'],
-  supervisor: ['dashboard', 'materias', 'hornadas', 'acabado', 'ventas', 'cobros', 'clientes', 'finanzas', 'contactos', 'documentacion', 'equipos', 'reportes'],
-  supervisor_ventas: ['ventas', 'cobros', 'clientes', 'finanzas', 'reportes'],
-  finanzas: ['dashboard', 'cobros', 'clientes', 'finanzas', 'reportes'],
-  operario: ['dashboard', 'materias', 'hornadas', 'acabado', 'contactos', 'documentacion', 'equipos'],
+  admin: [...corePanels, 'usuarios', 'auditoria'],
+  supervisor: corePanels,
+  supervisor_ventas: ['dashboard', 'ventas', 'cobros', 'clientes', 'finanzas', 'compras_gastos'],
+  finanzas: ['dashboard', 'cobros', 'clientes', 'finanzas', 'compras_gastos'],
+  operario: ['dashboard'],
 };
 
 const createAccess: Record<string, string[]> = {
-  admin: ['ventas', 'clientes', 'hornadas', 'materias', 'cobros', 'proyectos', 'equipos', 'documentacion'],
-  supervisor: ['ventas', 'clientes', 'cobros', 'hornadas', 'materias', 'equipos', 'documentacion'],
+  admin: ['ventas', 'clientes', 'cobros'],
+  supervisor: ['ventas', 'clientes', 'cobros'],
   supervisor_ventas: ['ventas', 'clientes', 'cobros'],
   finanzas: ['cobros'],
-  operario: ['hornadas', 'materias', 'acabado'],
+  operario: [],
 };
 
 export function canAccessPanel(role: UserRole, panel: string) {

@@ -28,7 +28,7 @@ import {
   cotizacionesService,
   seguimientosService,
 } from '../services/api';
-import { calculateFinishedInventory, unitsForSale } from '../utils/inventory';
+import { calculateFinishedInventory } from '../utils/inventory';
 import { ventaSaldoPendiente, ventaTotal } from '../utils/financial';
 
 interface AppContextType {
@@ -488,48 +488,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addRecepcion = async (data: Recepcion) => {
     // Agregar localmente primero
-    const dataConId = { ...data, id: data.id || Date.now().toString() };
-    setRecepciones([...recepciones, dataConId]);
 
     // Luego guardar en API en background
     try {
-      await materiasService.crear(data);
+      const response = await materiasService.crear(data);
+      const dataConId = { ...data, id: response.id || data.id || Date.now().toString() };
+      setRecepciones([...recepciones, dataConId]);
     } catch (error) {
-      console.log('⚠️ Error al guardar en API:', error);
+      console.log('Error al guardar en API:', error);
+      throw error;
     }
   };
 
   const addHornada = async (data: Hornada) => {
     // Agregar localmente primero
-    const dataConId = { ...data, id: data.id || Date.now().toString() };
-    setHornadas([...hornadas, dataConId]);
 
     // Luego guardar en API en background
     try {
-      await hornadasService.crear(data);
+      const response = await hornadasService.crear(data);
+      const dataConId = { ...data, id: response.id || data.id || Date.now().toString() };
+      setHornadas([...hornadas, dataConId]);
     } catch (error) {
-      console.log('⚠️ Error al guardar en API:', error);
+      console.log('Error al guardar en API:', error);
+      throw error;
     }
   };
 
   const addVenta = async (data: Venta) => {
-    const inventario = calculateFinishedInventory(acabado, ventas);
-    const unidadesSolicitadas = unitsForSale(data.formato, data.cantidad, data.unidadesPorCaja);
-    if (unidadesSolicitadas > inventario.disponibles) {
-      throw new Error(`Stock insuficiente. Disponible: ${inventario.disponibles} unidades.`);
-    }
-
     // Agregar localmente primero
     const totalVenta = ventaTotal(data);
     const dataConId = {
       ...data,
       id: data.id || Date.now().toString(),
-      total: data.total ?? data.precioTotal ?? 0,
-      precioTotal: data.precioTotal ?? data.total ?? 0,
+      total: totalVenta,
+      precioTotal: totalVenta,
       saldoPendiente: data.saldoPendiente ?? (data.tipoPago === 'credito' ? totalVenta : 0),
       estado: data.estado || (data.tipoPago === 'credito' ? 'pendiente' : 'pagado'),
     };
-    setVentas([...ventas, dataConId]);
 
     // Si el cliente de la venta no existe, agregarlo automáticamente
     const clienteExiste = clientes.some(c => c.nombre === data.cliente);
@@ -542,79 +537,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
         email: '',
         ciudad: '',
         direccion: '',
-        ventaMes: data.total || 0,
+        ventaMes: totalVenta,
         cobradoMes: 0,
       };
-      setClientes([...clientes, newCliente]);
-
-      // Guardar cliente en API en background
-      clientesService.crear(newCliente).catch(err =>
-        console.log('⚠️ Error al guardar cliente:', err)
-      );
+      const clienteResponse = await clientesService.crear(newCliente);
+      setClientes([...clientes, { ...newCliente, id: clienteResponse.id || newCliente.id }]);
     }
 
     // Luego guardar venta en API en background
     try {
-      await ventasService.crear(dataConId);
+      const response = await ventasService.crear(dataConId);
+      setVentas([...ventas, {
+        ...dataConId,
+        id: response.id || dataConId.id,
+        total: response.total ?? dataConId.total,
+        precioTotal: response.total ?? dataConId.precioTotal,
+        saldoPendiente: response.saldoPendiente ?? dataConId.saldoPendiente,
+        estado: response.estado || dataConId.estado,
+      }]);
     } catch (error) {
-      console.log('⚠️ Error al guardar en API:', error);
+      console.log('Error al guardar venta en API:', error);
+      throw error;
     }
   };
 
   const addCobro = async (data: Cobro & { distribucion?: { id: string; aplicado: number }[] }) => {
-    // Agregar localmente primero (respuesta inmediata)
-    const dataConId = { ...data, id: data.id || Date.now().toString() };
-    setCobros([...cobros, dataConId]);
-
-    // Descontar los saldos de las ventas afectadas (FIFO local)
-    if (data.distribucion && data.distribucion.length > 0) {
-      const aplicados = new Map(data.distribucion.map((d) => [d.id, d.aplicado]));
-      setVentas(ventas.map((v) => {
-        const aplicado = aplicados.get(v.id);
-        if (!aplicado) return v;
-        const saldoActual = ventaSaldoPendiente(v);
-        const nuevoSaldo = Math.max(0, Math.round((saldoActual - aplicado) * 100) / 100);
-        return {
-          ...v,
-          saldoPendiente: nuevoSaldo,
-          estado: nuevoSaldo <= 0 ? 'pagado' : 'parcial',
-        };
-      }));
-    }
-
-    // Luego guardar en API en background (el backend aplica el mismo FIFO en la BD)
     try {
       await cobrosService.crear(data);
+      const [ventasActualizadas, cobrosActualizados] = await Promise.all([
+        ventasService.listar(),
+        cobrosService.listar(),
+      ]);
+      setVentas(ventasActualizadas);
+      setCobros(cobrosActualizados);
     } catch (error) {
-      console.log('⚠️ Error al guardar en API, usando datos locales:', error);
+      console.log('Error al guardar cobro en API:', error);
+      throw error;
     }
   };
-
   const addCliente = async (data: Cliente) => {
-    // Agregar localmente primero
-    const dataConId = { ...data, id: data.id || Date.now().toString() };
-    setClientes([...clientes, dataConId]);
-
-    // Luego guardar en API en background
     try {
-      await clientesService.crear(data);
+      const response = await clientesService.crear(data);
+      const dataConId = { ...data, id: response.id || data.id || Date.now().toString() };
+      setClientes([...clientes, dataConId]);
     } catch (error) {
-      console.log('⚠️ Error al guardar cliente en API:', error);
+      console.log('Error al guardar cliente en API:', error);
+      throw error;
     }
   };
-
   const updateCliente = async (id: string, data: Cliente) => {
-    const previous = clientes.find((cliente) => cliente.id === id);
-    setClientes(clientes.map((cliente) => (cliente.id === id ? { ...cliente, ...data, id } : cliente)));
-
-    try {
-      await clientesService.actualizar(id, data);
-    } catch (error) {
-      console.log('Error al actualizar cliente en API:', error);
-      if (previous) {
-        setClientes(clientes.map((cliente) => (cliente.id === id ? previous : cliente)));
-      }
-    }
+    await clientesService.actualizar(id, data);
+    setClientes((current) => current.map((cliente) => cliente.id === id ? { ...cliente, ...data, id } : cliente));
   };
 
   const addProyecto = async (data: Proyecto) => {
@@ -938,11 +911,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await ventasService.eliminar(id);
       setVentas(ventas.filter((v) => v.id !== id));
     } catch (error) {
-      console.log('⚠️ Eliminando de datos locales:', error);
-      setVentas(ventas.filter((v) => v.id !== id));
+      console.log('Error al eliminar venta en API:', error);
+      throw error;
     }
   };
-
   const inventario = calculateFinishedInventory(acabado, ventas);
 
   const kpis = {

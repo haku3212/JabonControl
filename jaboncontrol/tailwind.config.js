@@ -8,30 +8,30 @@ export default {
     extend: {
       colors: {
         dark: {
-          bg: '#0b0d10',
-          surface: '#12161b',
-          surface2: '#181d24',
-          surface3: '#202630',
-          border: '#2b3440',
+          bg: '#f3f5f4',
+          surface: '#ffffff',
+          surface2: '#f7f9f8',
+          surface3: '#e9eeec',
+          border: '#d6dfda',
         },
         accent: {
-          yellow: '#d9a441',
-          orange: '#d97a35',
-          blue: '#5aa7f0',
+          yellow: '#176753',
+          orange: '#aa6632',
+          blue: '#176753',
         },
         status: {
-          success: '#3ddc84',
-          danger: '#ef5b5b',
-          warning: '#d9a441',
+          success: '#4d7a5d',
+          danger: '#a45147',
+          warning: '#8f7a35',
         },
         text: {
-          primary: '#edf1f5',
-          secondary: '#aab3bd',
-          tertiary: '#6f7a86',
+          primary: '#202925',
+          secondary: '#4f6058',
+          tertiary: '#65766e',
         }
       },
       fontFamily: {
-        bebas: ['Bebas Neue', 'cursive'],
+        bebas: ['IBM Plex Sans', 'sans-serif'],
         mono: ['IBM Plex Mono', 'monospace'],
         sans: ['IBM Plex Sans', 'sans-serif'],
       }

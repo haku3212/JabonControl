@@ -7,7 +7,7 @@ const { Pool } = require('pg');
 
 const usePostgres = Boolean(process.env.DATABASE_URL);
 const volumePath = process.env.RAILWAY_VOLUME_MOUNT_PATH;
-const dbPath = process.env.DATABASE || (volumePath ? path.join(volumePath, 'database.db') : './database.db');
+const dbPath = process.env.DATABASE || (volumePath ? path.join(volumePath, 'database.db') : path.join(__dirname, 'database.db'));
 
 let sqlDb = null;
 let pgPool = null;
@@ -30,6 +30,9 @@ function normalizePgRow(row) {
     saldopendiente: 'saldoPendiente',
     montocobrado: 'montoCobrado',
     metodopago: 'metodoPago',
+    cuentaempresa: 'cuentaEmpresa',
+    estadoentrega: 'estadoEntrega',
+    fecharecojo: 'fechaRecojo',
     notascorrespondientes: 'notasCorrespondientes',
     horainicio: 'horaInicio',
     naohvolumen: 'naohVolumen',
@@ -105,11 +108,18 @@ function timestampType() {
 }
 
 async function initStorage() {
+  if (process.env.NODE_ENV === 'production' && !usePostgres) {
+    throw new Error('DATABASE_URL es obligatoria en produccion para conservar los datos.');
+  }
   if (usePostgres) {
     pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false },
+      max: Number(process.env.PG_POOL_MAX || 5),
+      connectionTimeoutMillis: 15000,
+      idleTimeoutMillis: 30000,
     });
+    pgPool.on('error', (error) => console.error('Error de conexion PostgreSQL:', error.code || 'desconocido'));
     await pgPool.query('SELECT 1');
     return;
   }
@@ -154,6 +164,7 @@ async function createTables() {
       detalle TEXT,
       valores_anteriores TEXT,
       valores_nuevos TEXT,
+      secuencia INTEGER,
       hash_anterior TEXT,
       hash_evento TEXT,
       creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
@@ -164,6 +175,7 @@ async function createTables() {
   await tryRun('UPDATE usuarios SET password_actualizado_en = COALESCE(password_actualizado_en, creado_en, CURRENT_TIMESTAMP)');
   await tryRun('ALTER TABLE audit_logs ADD COLUMN hash_anterior TEXT');
   await tryRun('ALTER TABLE audit_logs ADD COLUMN hash_evento TEXT');
+  await tryRun('ALTER TABLE audit_logs ADD COLUMN secuencia INTEGER');
 
   await run(`
     CREATE TABLE IF NOT EXISTS clientes (
@@ -193,6 +205,11 @@ async function createTables() {
       precioUnitario REAL NOT NULL,
       total REAL NOT NULL,
       tipoPago TEXT NOT NULL,
+      metodoPago TEXT,
+      cuentaEmpresa TEXT,
+      estadoEntrega TEXT DEFAULT 'entregado',
+      fechaRecojo TEXT,
+      observaciones TEXT,
       estado TEXT DEFAULT 'pendiente',
       saldoPendiente REAL,
       creado_en ${ts} DEFAULT CURRENT_TIMESTAMP
@@ -277,6 +294,11 @@ async function createTables() {
 
   await tryRun('ALTER TABLE ventas ADD COLUMN saldoPendiente REAL');
   await tryRun('ALTER TABLE ventas ADD COLUMN unidadesPorCaja REAL DEFAULT 50');
+  await tryRun('ALTER TABLE ventas ADD COLUMN metodoPago TEXT');
+  await tryRun('ALTER TABLE ventas ADD COLUMN cuentaEmpresa TEXT');
+  await tryRun("ALTER TABLE ventas ADD COLUMN estadoEntrega TEXT DEFAULT 'entregado'");
+  await tryRun('ALTER TABLE ventas ADD COLUMN fechaRecojo TEXT');
+  await tryRun('ALTER TABLE ventas ADD COLUMN observaciones TEXT');
   await run("UPDATE ventas SET unidadesPorCaja = 50 WHERE unidadesPorCaja IS NULL AND LOWER(formato) LIKE '%caja%'");
   await run("UPDATE ventas SET unidadesPorCaja = 1 WHERE unidadesPorCaja IS NULL");
   await run("UPDATE ventas SET cantidad = 18, unidadesPorCaja = 50, total = 396 WHERE id = 'demo-ven-1'");
@@ -479,24 +501,26 @@ function auditPayload(log, hashAnterior) {
 }
 
 async function backfillAuditHashes() {
-  const logs = await all('SELECT * FROM audit_logs ORDER BY creado_en ASC');
+  const logs = await all('SELECT * FROM audit_logs ORDER BY COALESCE(secuencia, 0) ASC, creado_en ASC, id ASC');
   let previousHash = '';
+  let secuencia = 1;
   for (const log of logs) {
-    const hasHash = Boolean(log.hash_evento);
-    const hashAnterior = hasHash ? (log.hash_anterior || '') : previousHash;
-    const hashEvento = hasHash ? log.hash_evento : crypto.createHash('sha256').update(auditPayload(log, hashAnterior)).digest('hex');
-    if (!hasHash) {
-      await run('UPDATE audit_logs SET hash_anterior = ?, hash_evento = ? WHERE id = ?', [hashAnterior, hashEvento, log.id]);
+    const hashAnterior = previousHash;
+    const hashEvento = crypto.createHash('sha256').update(auditPayload(log, hashAnterior)).digest('hex');
+    if ((log.hash_anterior || '') !== hashAnterior || (log.hash_evento || '') !== hashEvento || Number(log.secuencia || 0) !== secuencia) {
+      await run('UPDATE audit_logs SET secuencia = ?, hash_anterior = ?, hash_evento = ? WHERE id = ?', [secuencia, hashAnterior, hashEvento, log.id]);
     }
     previousHash = hashEvento || '';
+    secuencia += 1;
   }
 }
 
 async function logAudit(req, accion, tabla, registroId, anteriores, nuevos, detalle) {
   const actor = req?.user || {};
   const id = crypto.randomUUID();
-  const previous = await get('SELECT hash_evento FROM audit_logs ORDER BY creado_en DESC LIMIT 1');
+  const previous = await get('SELECT hash_evento, secuencia FROM audit_logs ORDER BY COALESCE(secuencia, 0) DESC, creado_en DESC LIMIT 1');
   const hashAnterior = previous?.hash_evento || '';
+  const secuencia = Number(previous?.secuencia || 0) + 1;
   const valoresAnteriores = safeJson(anteriores);
   const valoresNuevos = safeJson(nuevos);
   const log = {
@@ -515,8 +539,8 @@ async function logAudit(req, accion, tabla, registroId, anteriores, nuevos, deta
 
   await run(
     `INSERT INTO audit_logs
-      (id, usuario_id, usuario, rol, accion, tabla, registro_id, detalle, valores_anteriores, valores_nuevos, hash_anterior, hash_evento)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, usuario_id, usuario, rol, accion, tabla, registro_id, detalle, valores_anteriores, valores_nuevos, secuencia, hash_anterior, hash_evento)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       log.usuario_id,
@@ -528,6 +552,7 @@ async function logAudit(req, accion, tabla, registroId, anteriores, nuevos, deta
       log.detalle,
       valoresAnteriores,
       valoresNuevos,
+      secuencia,
       hashAnterior,
       hashEvento,
     ]
