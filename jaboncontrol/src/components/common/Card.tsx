@@ -20,11 +20,11 @@ const badgeColors = {
 
 export function Card({ title, children, action, badge }: CardProps) {
   return (
-    <section className="bg-dark-surface border border-dark-border rounded-md overflow-hidden shadow-[0_1px_3px_rgba(36,35,33,0.04)]">
-      <div className="px-4 py-3 border-b border-dark-border flex items-center justify-between bg-white">
-        <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
+    <section className="module-section min-w-0">
+      <div className="module-section-header">
+        <h2 className="text-sm font-semibold text-text-primary">
           {title}
-        </div>
+        </h2>
         <div className="flex items-center gap-2">
           {badge && (
             <span className={`inline-flex items-center px-2 py-1 rounded border text-xs font-medium ${badgeColors[badge.type]}`}>

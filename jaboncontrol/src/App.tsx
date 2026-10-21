@@ -87,6 +87,25 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     }
   }, [activePanel, user.rol]);
 
+  useEffect(() => {
+    if (!isMobile || !sidebarOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const sidebar = document.querySelector('aside');
+    const buttons = Array.from(sidebar?.querySelectorAll<HTMLButtonElement>('button') || []);
+    buttons[0]?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSidebarOpen(false);
+      if (event.key !== 'Tab' || !buttons.length) return;
+      const target = event.shiftKey ? buttons[buttons.length - 1] : buttons[0];
+      if ((event.shiftKey && document.activeElement === buttons[0]) || (!event.shiftKey && document.activeElement === buttons[buttons.length - 1])) {
+        event.preventDefault();
+        target.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => { document.removeEventListener('keydown', handleKey); previous?.focus(); };
+  }, [isMobile, sidebarOpen]);
+
   const handleNavigate = (panel: string) => {
     if (!canAccessPanel(user.rol, panel)) {
       showNotificationMsg('No tienes permiso para abrir este modulo.');
@@ -240,7 +259,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
   };
 
   return (
-    <div className="flex h-screen app-shell flex-col md:flex-row">
+    <div className="flex h-dvh app-shell flex-col md:flex-row">
       {/* Sidebar - Mobile overlay */}
       {isMobile && sidebarOpen && (
         <div
@@ -250,15 +269,16 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
       )}
 
       <div
+        style={{ visibility: isMobile && !sidebarOpen ? 'hidden' : undefined }}
         className={`${
           isMobile
-            ? `fixed top-0 left-0 h-screen z-40 transform transition-transform ${
-                sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            ? `fixed top-0 left-0 h-dvh z-40 ${
+                sidebarOpen ? '' : 'hidden'
               }`
             : 'static'
         } w-60 md:w-60`}
       >
-        <Sidebar user={user} activePanel={activePanel} onNavigate={(panel) => {
+        <Sidebar user={user} activePanel={activePanel} onClose={() => setSidebarOpen(false)} onNavigate={(panel) => {
           handleNavigate(panel);
           if (isMobile) setSidebarOpen(false);
         }} />
@@ -273,11 +293,11 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
           isMobile={isMobile}
           onLogout={onLogout}
           user={user}
-          canCreate={canCreateInPanel(user.rol, activePanel)}
+          canCreate={canCreateInPanel(user.rol, activePanel) && !['ventas', 'clientes', 'cobros'].includes(activePanel)}
         />
 
         {/* El padding baja en movil para aprovechar mejor el ancho disponible. */}
-        <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
+        <main className="workspace flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {hasAccess ? (panelComponents[activePanel] || <Dashboard />) : (
             <div className="bg-dark-surface border border-dark-border rounded-md p-8 text-center text-text-secondary">
               No tienes permiso para ver este modulo.

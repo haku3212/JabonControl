@@ -1,3 +1,5 @@
+import { CalendarDays, ChevronRight, LogOut, Menu, Plus } from 'lucide-react';
+
 interface TopbarProps {
   user?: { nombre: string; rol: string };
   title: string;
@@ -9,78 +11,19 @@ interface TopbarProps {
   canCreate?: boolean;
 }
 
-export function Topbar({ user, title, breadcrumb, onNewClick, onMenuClick, isMobile, onLogout, canCreate = true }: TopbarProps) {
-  const today = new Date();
-  const dateStr = today.toLocaleDateString('es-BO', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  });
-
+export function Topbar({ title, breadcrumb, onNewClick, onMenuClick, isMobile, onLogout, canCreate = true }: TopbarProps) {
+  const date = new Date().toLocaleDateString('es-BO', { day: 'numeric', month: 'short', year: 'numeric' });
+  const group = title === 'Dashboard' ? 'General' : breadcrumb.split('/')[0].trim().toLocaleLowerCase('es');
   return (
-    <header className="h-16 bg-white border-b border-dark-border flex items-center px-3 md:px-6 gap-3 flex-shrink-0">
-      {isMobile && (
-        <button
-          onClick={onMenuClick}
-          className="h-9 w-9 rounded-md border border-dark-border bg-white text-text-secondary hover:text-text-primary transition"
-          aria-label="Abrir menu"
-        >
-          <svg
-            className="mx-auto h-4 w-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <path d="M4 7h16" />
-            <path d="M4 12h16" />
-            <path d="M4 17h16" />
-          </svg>
-        </button>
-      )}
-
-      <div className="flex-1 min-w-0">
-        <div className="text-lg md:text-xl font-semibold text-text-primary truncate">
-          {title}
-        </div>
-        <div className="text-xs text-text-tertiary hidden sm:block">
-          {breadcrumb}
-        </div>
+    <header className="app-topbar">
+      {isMobile && <button onClick={onMenuClick} className="icon-button shrink-0" aria-label="Abrir menu" title="Abrir menu"><Menu size={20} /></button>}
+      <div className="flex items-center gap-2 min-w-0 flex-1 text-sm">
+        <span className="hidden sm:block capitalize text-text-tertiary">{group}</span><ChevronRight size={14} className="hidden sm:block text-text-tertiary shrink-0" aria-hidden="true" />
+        <span className="font-medium truncate">{title === 'Dashboard' ? 'Inicio' : title}</span>
       </div>
-
-      <div className="ml-auto flex items-center gap-2 md:gap-3">
-        <div className="hidden sm:block rounded-md border border-dark-border bg-dark-surface2 px-3 py-2 text-xs text-text-secondary">
-          {dateStr}
-        </div>
-        {user && (
-          <div className="hidden md:block text-right leading-tight">
-            <div className="text-sm font-medium text-text-primary">{user.nombre}</div>
-            <div className="text-[11px] text-text-tertiary uppercase">{user.rol}</div>
-          </div>
-        )}
-        {canCreate && (
-          <button
-            onClick={onNewClick}
-            className="rounded-md bg-accent-blue px-3 py-2 text-xs font-semibold text-white hover:bg-[#284f60] transition whitespace-nowrap"
-          >
-            <span className="hidden sm:inline">Nuevo registro</span>
-            <span className="sm:hidden">Nuevo</span>
-          </button>
-        )}
-        {onLogout && (
-          <button
-            onClick={() => {
-              if (confirm('Cerrar sesion?')) onLogout();
-            }}
-            title="Cerrar sesion"
-            className="rounded-md border border-dark-border bg-white px-3 py-2 text-xs font-medium text-text-secondary hover:border-status-danger hover:text-status-danger transition"
-          >
-            Salir
-          </button>
-        )}
-      </div>
+      <div className="hidden lg:flex items-center gap-2 text-xs text-text-tertiary mr-3"><CalendarDays size={15} aria-hidden="true" />{date}</div>
+      {canCreate && <button onClick={onNewClick} className="action-primary shrink-0"><Plus size={16} aria-hidden="true" /><span className="hidden sm:inline">Nuevo registro</span><span className="sm:hidden">Nuevo</span></button>}
+      {onLogout && <button onClick={() => { if (confirm('Cerrar sesion?')) onLogout(); }} aria-label="Cerrar sesion" title="Cerrar sesion" className="icon-button shrink-0"><LogOut size={18} /></button>}
     </header>
   );
 }

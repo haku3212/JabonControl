@@ -33,7 +33,9 @@ export function Table({ columns, data, onRowClick }: TableProps) {
             <tr
               key={idx}
               onClick={() => onRowClick?.(row)}
-              className="border-b border-dark-border hover:bg-dark-surface2 transition-colors cursor-pointer"
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={onRowClick ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onRowClick(row); } } : undefined}
+              className={`border-b border-dark-border hover:bg-dark-surface2 transition-colors ${onRowClick ? 'cursor-pointer focus-ring' : ''}`}
             >
               {columns.map((col) => (
                 <td

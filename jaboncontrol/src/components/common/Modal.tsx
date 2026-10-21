@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useRef, useId } from 'react';
+import { Save, X } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -37,13 +38,13 @@ export function Modal({ isOpen, title, children, onClose, hideFooter = true, onS
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-3 sm:p-5"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="bg-dark-surface border border-dark-border rounded-lg w-full max-w-2xl md:max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto fade-in mx-2 md:mx-0">
         {/* Header */}
         <div className="px-4 md:px-5 py-3 md:py-4 border-b border-dark-border flex items-center justify-between sticky top-0 bg-dark-surface z-10">
-          <div id={titleId} className="text-lg font-semibold text-text-primary truncate">
+          <div id={titleId} className="text-lg font-semibold text-text-primary break-words pr-3 min-w-0">
             {title}
           </div>
           <button
@@ -51,7 +52,7 @@ export function Modal({ isOpen, title, children, onClose, hideFooter = true, onS
             onClick={onClose}
             className="text-text-tertiary hover:text-text-primary text-xl w-8 h-8 flex items-center justify-center rounded hover:bg-dark-surface2 transition-colors flex-shrink-0"
           >
-            ✕
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
 
@@ -71,9 +72,9 @@ export function Modal({ isOpen, title, children, onClose, hideFooter = true, onS
             </button>
             <button
               onClick={onSave}
-              className="px-3 py-1.5 bg-accent-yellow text-black text-xs font-medium rounded hover:bg-opacity-90 transition-all"
+              className="action-primary"
             >
-              💾 Guardar
+              <Save size={16} aria-hidden="true" />Guardar
             </button>
           </div>
         )}

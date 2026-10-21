@@ -8,15 +8,15 @@ export default {
     extend: {
       colors: {
         dark: {
-          bg: '#f3f5f4',
+          bg: '#f5f6f8',
           surface: '#ffffff',
-          surface2: '#f7f9f8',
-          surface3: '#e9eeec',
-          border: '#d6dfda',
+          surface2: '#f8f9fb',
+          surface3: '#edf0f3',
+          border: '#e0e5e9',
         },
         accent: {
           yellow: '#176753',
-          orange: '#aa6632',
+          orange: '#ab642a',
           blue: '#176753',
         },
         status: {
@@ -25,9 +25,9 @@ export default {
           warning: '#8f7a35',
         },
         text: {
-          primary: '#202925',
-          secondary: '#4f6058',
-          tertiary: '#65766e',
+          primary: '#242c35',
+          secondary: '#536170',
+          tertiary: '#667482',
         }
       },
       fontFamily: {

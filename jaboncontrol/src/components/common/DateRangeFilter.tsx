@@ -1,4 +1,5 @@
 import type { DateRange } from '../../utils/dateFilters';
+import { RotateCcw } from 'lucide-react';
 
 interface DateRangeFilterProps {
   value: DateRange;
@@ -7,7 +8,7 @@ interface DateRangeFilterProps {
 
 export function DateRangeFilter({ value, onChange }: DateRangeFilterProps) {
   return (
-    <div className="flex flex-wrap items-end gap-2">
+    <div className="date-range">
       <label className="block">
         <span className="text-xs font-mono text-text-tertiary uppercase block mb-1">Desde</span>
         <input
@@ -28,9 +29,12 @@ export function DateRangeFilter({ value, onChange }: DateRangeFilterProps) {
       </label>
       <button
         onClick={() => onChange({ from: '', to: '' })}
-        className="px-3 py-2 bg-dark-surface3 text-text-secondary text-xs rounded border border-dark-border hover:border-accent-yellow hover:text-accent-yellow"
+        type="button"
+        aria-label="Limpiar fechas"
+        title="Limpiar fechas"
+        className="icon-button mb-0.5"
       >
-        Limpiar
+        <RotateCcw size={16} aria-hidden="true" />
       </button>
     </div>
   );
