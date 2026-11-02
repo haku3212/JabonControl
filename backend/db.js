@@ -11,6 +11,7 @@ const dbPath = process.env.DATABASE || (volumePath ? path.join(volumePath, 'data
 
 let sqlDb = null;
 let pgPool = null;
+let sqliteTransactionTail = Promise.resolve();
 
 function toPgSql(sql) {
   let index = 0;
@@ -515,10 +516,10 @@ async function backfillAuditHashes() {
   }
 }
 
-async function logAudit(req, accion, tabla, registroId, anteriores, nuevos, detalle) {
+async function logAudit(req, accion, tabla, registroId, anteriores, nuevos, detalle, executor = { get, run, save: saveDB }) {
   const actor = req?.user || {};
   const id = crypto.randomUUID();
-  const previous = await get('SELECT hash_evento, secuencia FROM audit_logs ORDER BY COALESCE(secuencia, 0) DESC, creado_en DESC LIMIT 1');
+  const previous = await executor.get('SELECT hash_evento, secuencia FROM audit_logs ORDER BY COALESCE(secuencia, 0) DESC, creado_en DESC LIMIT 1');
   const hashAnterior = previous?.hash_evento || '';
   const secuencia = Number(previous?.secuencia || 0) + 1;
   const valoresAnteriores = safeJson(anteriores);
@@ -537,7 +538,7 @@ async function logAudit(req, accion, tabla, registroId, anteriores, nuevos, deta
   };
   const hashEvento = crypto.createHash('sha256').update(auditPayload(log, hashAnterior)).digest('hex');
 
-  await run(
+  await executor.run(
     `INSERT INTO audit_logs
       (id, usuario_id, usuario, rol, accion, tabla, registro_id, detalle, valores_anteriores, valores_nuevos, secuencia, hash_anterior, hash_evento)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -557,7 +558,34 @@ async function logAudit(req, accion, tabla, registroId, anteriores, nuevos, deta
       hashEvento,
     ]
   );
-  await saveDB();
+  await executor.save();
+}
+
+// Contacts use one connection for the record and its audit event in PostgreSQL.
+async function withTransaction(work) {
+  if (!usePostgres) {
+    const pending = sqliteTransactionTail.then(async () => {
+      sqlDb.run('BEGIN');
+      try {
+        const result = await work({ all, get, run, save: async () => {} });
+        sqlDb.run('COMMIT');
+        await saveDB();
+        return result;
+      } catch (error) { sqlDb.run('ROLLBACK'); throw error; }
+    });
+    sqliteTransactionTail = pending.catch(() => {});
+    return pending;
+  }
+  const client = await pgPool.connect();
+  const query = async (sql, params = []) => (await client.query(toPgSql(sql), params)).rows.map(normalizePgRow);
+  const executor = { all: query, get: async (sql, params) => (await query(sql, params))[0] || null, run: query, save: async () => {} };
+  try {
+    await client.query('BEGIN');
+    const result = await work(executor);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
 async function resetOperationalData(req) {
@@ -598,5 +626,6 @@ module.exports.get = get;
 module.exports.run = run;
 module.exports.save = saveDB;
 module.exports.logAudit = logAudit;
+module.exports.withTransaction = withTransaction;
 module.exports.resetOperationalData = resetOperationalData;
 module.exports.isPostgres = () => usePostgres;

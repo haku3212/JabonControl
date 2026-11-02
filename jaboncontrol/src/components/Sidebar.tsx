@@ -1,4 +1,4 @@
-import { ArrowDownUp, ChartNoAxesCombined, ClipboardCheck, LayoutDashboard, ReceiptText, ShoppingBag, Users, UserRoundCog, Wallet, X, type LucideIcon } from 'lucide-react';
+import { ArrowDownUp, ContactRound, ChartNoAxesCombined, ClipboardCheck, LayoutDashboard, ReceiptText, ShoppingBag, Users, UserRoundCog, Wallet, X, type LucideIcon } from 'lucide-react';
 import { visiblePanels } from '../utils/permissions';
 
 interface SidebarProps {
@@ -14,6 +14,7 @@ const sections: Array<{ label: string; items: Array<{ id: string; icon: LucideIc
     { id: 'ventas', icon: ShoppingBag, label: 'Ventas' },
     { id: 'cobros', icon: Wallet, label: 'Cobros' },
     { id: 'clientes', icon: Users, label: 'Clientes' },
+    { id: 'contactos', icon: ContactRound, label: 'Contactos' },
   ] },
   { label: 'Finanzas', items: [
     { id: 'finanzas', icon: ChartNoAxesCombined, label: 'Resumen financiero' },

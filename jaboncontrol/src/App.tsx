@@ -14,7 +14,7 @@ import { Clientes } from './components/panels/Clientes';
 import { Finanzas } from './components/panels/Finanzas';
 import { ComprasGastos } from './components/panels/ComprasGastos';
 import { Proyectos } from './components/panels/Proyectos';
-import { Contactos } from './components/panels/Contactos';
+import { Contactos } from './components/panels/AgendaContactos';
 import { Documentacion } from './components/panels/Documentacion';
 import { Equipos } from './components/panels/Equipos';
 import { Reportes } from './components/panels/Reportes';
@@ -248,7 +248,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     finanzas: <Finanzas />,
     compras_gastos: <ComprasGastos />,
     proyectos: <Proyectos />,
-    contactos: <Contactos />,
+    contactos: <Contactos userRole={user.rol} />,
     documentacion: <Documentacion onNewClick={() => setModalType('documento')} />,
     equipos: <Equipos onNewClick={() => setModalType('equipo')} />,
     reportes: <Reportes />,

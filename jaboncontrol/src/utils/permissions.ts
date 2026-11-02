@@ -1,12 +1,12 @@
 export type UserRole = 'admin' | 'supervisor' | 'supervisor_ventas' | 'finanzas' | 'operario' | string;
 
-const corePanels = ['dashboard', 'ventas', 'cobros', 'finanzas', 'compras_gastos', 'clientes'];
+const corePanels = ['dashboard', 'ventas', 'cobros', 'finanzas', 'compras_gastos', 'clientes', 'contactos'];
 
 const roleAccess: Record<string, string[]> = {
   admin: [...corePanels, 'usuarios', 'auditoria'],
   supervisor: corePanels,
-  supervisor_ventas: ['dashboard', 'ventas', 'cobros', 'clientes', 'finanzas', 'compras_gastos'],
-  finanzas: ['dashboard', 'cobros', 'clientes', 'finanzas', 'compras_gastos'],
+  supervisor_ventas: ['dashboard', 'ventas', 'cobros', 'clientes', 'finanzas', 'compras_gastos', 'contactos'],
+  finanzas: ['dashboard', 'cobros', 'clientes', 'finanzas', 'compras_gastos', 'contactos'],
   operario: ['dashboard'],
 };
 

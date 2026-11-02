@@ -153,6 +153,14 @@ export interface EquipoApp {
 }
 
 export interface ContactoEmpresa {
+  tipo?: 'persona' | 'empresa';
+  categorias?: string[];
+  telefonoAlternativo?: string;
+  whatsapp?: string;
+  placa?: string;
+  vehiculo?: string;
+  cobertura?: string;
+  revision?: number;
   id: string;
   nombre: string;
   empresa: string;

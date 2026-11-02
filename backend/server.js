@@ -127,7 +127,7 @@ app.use('/api/proyectos', verifyToken, requireRoles('admin'), createAppRecordsRo
 app.use('/api/documentos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('documentos'));
 app.use('/api/equipos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('equipos'));
 app.use('/api/acabado', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('acabado'));
-app.use('/api/contactos', verifyToken, requireRoles('admin', 'operario'), createAppRecordsRouter('contactos'));
+app.use('/api/contactos', verifyToken, requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), require('./routes/contactos'));
 app.use('/api/usuarios', verifyToken, requireAdmin, usuariosRoutes);
 app.get('/api/auditoria', verifyToken, requireAdmin, async (req, res) => {
   try {
