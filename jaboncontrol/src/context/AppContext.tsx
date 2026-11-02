@@ -73,7 +73,8 @@ interface AppContextType {
 
   deleteRecepcion: (id: string) => void;
   deleteHornada: (id: string) => void;
-  deleteVenta: (id: string) => void;
+  deleteVenta: (id: string, motivo: string) => Promise<void>;
+  deleteCobro: (id: string, motivo: string) => Promise<void>;
   deleteProyecto: (id: string) => void;
   deleteDocumento: (id: string) => void;
   deleteEquipo: (id: string) => void;
@@ -906,14 +907,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const deleteVenta = async (id: string) => {
-    try {
-      await ventasService.eliminar(id);
-      setVentas(ventas.filter((v) => v.id !== id));
-    } catch (error) {
-      console.log('Error al eliminar venta en API:', error);
-      throw error;
-    }
+  const deleteVenta = async (id: string, motivo: string) => {
+    const result = await ventasService.eliminar(id, motivo);
+    setVentas(previous => previous.filter(item => item.id !== id).map(item => result.ventasActualizadas.find((updated: Venta) => updated.id === item.id) || item));
+  };
+  const deleteCobro = async (id: string, motivo: string) => {
+    const result = await cobrosService.eliminar(id, motivo);
+    setCobros(previous => previous.filter(item => item.id !== id));
+    setVentas(previous => previous.map(item => result.ventasActualizadas.find((updated: Venta) => updated.id === item.id) || item));
   };
   const inventario = calculateFinishedInventory(acabado, ventas);
 
@@ -966,6 +967,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteRecepcion,
     deleteHornada,
     deleteVenta,
+    deleteCobro,
     deleteProyecto,
     deleteDocumento,
     deleteEquipo,

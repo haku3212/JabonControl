@@ -40,7 +40,7 @@ async function request(endpoint, method = 'GET', body) {
     assert.equal((await request('/cobros', 'POST', { cliente: sale.cliente, montoCobrado: 151, metodoPago: 'efectivo' })).status, 400);
     assert.equal((await request(`/clientes/${client.data.id}`, 'DELETE')).status, 409);
     assert.equal((await request(`/clientes/${client.data.id}`, 'PUT', { nombre: 'Nombre cambiado', tipo: 'empresa' })).status, 409);
-    assert.equal((await request(`/ventas/${created.data.id}`, 'DELETE')).status, 409);
+    assert.equal((await request(`/ventas/${created.data.id}`, 'DELETE', { motivo: 'Registro de prueba' })).status, 409);
     assert.equal((await request(`/ventas/${created.data.id}`, 'PUT', { ...sale, cantidad: 1 })).status, 409);
     assert.equal((await request('/finanzas/movimientos', 'POST', { tipo: 'egreso', concepto: 'QA gasto', monto: -1 })).status, 400);
     assert.equal((await request('/finanzas/movimientos', 'POST', { tipo: 'egreso', concepto: 'QA gasto', monto: 25 })).status, 201);

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import { DeleteFinancialModal } from '../common/DeleteFinancialModal';
 import { Card } from '../common/Card';
 import { KPICard } from '../common/KPICard';
 import { Badge } from '../common/Badge';
@@ -16,16 +18,17 @@ interface VentasProps {
   userRole?: string;
 }
 
-const money = (value: number) => `Bs ${Math.round(value || 0).toLocaleString('es-BO')}`;
+const money = (value: number) => `Bs ${Number(value || 0).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) {
-  // Incluimos deleteVenta para poder eliminar notas con confirmacion.
   const { ventas, deleteVenta, updateVenta } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPago, setFilterPago] = useState('todos');
   const [dateRange, setDateRange] = useState(defaultDateRange());
   const [reportVenta, setReportVenta] = useState<any>(null);
   const [editing, setEditing] = useState<any>(null);
+  const [deleting, setDeleting] = useState<any>(null);
+  const [notice, setNotice] = useState('');
   const canDelete = userRole === 'admin';
   const canEdit = ['admin', 'supervisor', 'supervisor_ventas'].includes(userRole);
 
@@ -40,22 +43,6 @@ export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) 
   const contado = filteredVentas.filter((v) => ventaSaldoPendiente(v) <= 0);
   const credito = filteredVentas.filter((v) => ventaSaldoPendiente(v) > 0);
   const pendientesRecojo = filteredVentas.filter((v) => v.estadoEntrega === 'pendiente_recojo');
-  // Borrado seguro: exige confirmacion antes de tocar datos.
-  const safeDelete = async (venta: any) => {
-    // El mensaje incluye numero y cliente para evitar borrar la nota equivocada.
-    const ok = confirm(`Eliminar la nota ${venta.numeroNE} de ${venta.cliente}?`);
-
-    // Si el usuario cancela, no se ejecuta ninguna accion.
-    if (!ok) return;
-
-    // Si confirma, delegamos en el contexto para borrar local/API.
-    try {
-      await deleteVenta(venta.id);
-    } catch (error) {
-      alert('No se pudo eliminar la venta. Revise su conexion o permisos.');
-      console.error(error);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -69,6 +56,7 @@ export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) 
         </button>
       </div>
 
+      {notice && <p role="status" className="text-sm text-status-success">{notice}</p>}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <KPICard label="Periodo filtrado" value={money(totalPeriodo)} unit={`${filteredVentas.length} notas`} color="yellow" />
         <KPICard label="Credito pendiente" value={money(credito.reduce((s, v) => s + ventaSaldoPendiente(v), 0))} unit={`${credito.length} notas`} color="orange" />
@@ -140,8 +128,8 @@ export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) 
                         PDF
                       </button>
                       {canDelete && (
-                        <button onClick={() => safeDelete(venta)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-status-danger hover:text-status-danger" title="Eliminar con confirmacion">
-                          Eliminar
+                        <button onClick={() => { setDeleting(venta); setNotice(''); }} className="icon-button text-status-danger" title={`Eliminar ${venta.numeroNE}`} aria-label={`Eliminar ${venta.numeroNE}`}>
+                          <Trash2 size={17} />
                         </button>
                       )}
                     </div>
@@ -154,6 +142,7 @@ export function Ventas({ onNewClick, userRole = 'operario' }: VentasProps = {}) 
         </div>
       </Card>
 
+      {deleting && <DeleteFinancialModal title="Eliminar venta" record={`${deleting.numeroNE} · ${deleting.cliente} · ${money(deleting.total)}`} description="La venta dejara de contar en los totales. Se conservaran la copia del registro, el motivo y la auditoria. Si tiene cobros aplicados, debe eliminarlos primero desde Cobros." onClose={() => setDeleting(null)} onConfirm={async motivo => { await deleteVenta(deleting.id, motivo); setDeleting(null); setNotice('Venta eliminada. Los totales fueron actualizados.'); }} />}
       <ReportDownloadModal
         isOpen={Boolean(reportVenta)}
         title="Nota de entrega"

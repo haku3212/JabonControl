@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import { DeleteFinancialModal } from '../common/DeleteFinancialModal';
 import { Card } from '../common/Card';
 import { Badge } from '../common/Badge';
 import { DateRangeFilter } from '../common/DateRangeFilter';
@@ -13,13 +15,16 @@ interface CobrosProps {
   userRole?: string;
 }
 
-const money = (value: number) => `Bs ${Math.round(value || 0).toLocaleString('es-BO')}`;
+const money = (value: number) => `Bs ${Number(value || 0).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function Cobros({ onNewClick, userRole = 'operario' }: CobrosProps = {}) {
-  const { cobros, clientes, updateCobro } = useAppContext();
+  const { cobros, clientes, updateCobro, deleteCobro } = useAppContext();
   const [dateRange, setDateRange] = useState(defaultDateRange());
   const [reportCobro, setReportCobro] = useState<any>(null);
   const [editing, setEditing] = useState<any>(null);
+  const [deleting, setDeleting] = useState<any>(null);
+  const [notice, setNotice] = useState('');
+  const canDelete = userRole === 'admin';
   const canEdit = ['admin', 'supervisor', 'supervisor_ventas', 'finanzas'].includes(userRole);
   const filteredCobros = filterByDateRange(cobros, dateRange);
 
@@ -35,6 +40,7 @@ export function Cobros({ onNewClick, userRole = 'operario' }: CobrosProps = {}) 
         </button>
       </div>
 
+      {notice && <p role="status" className="text-sm text-status-success">{notice}</p>}
       <Card title="Cobros registrados" badge={{ label: `${filteredCobros.length} registros`, type: 'info' }}>
         <div className="mb-4">
           <DateRangeFilter value={dateRange} onChange={setDateRange} />
@@ -66,6 +72,7 @@ export function Cobros({ onNewClick, userRole = 'operario' }: CobrosProps = {}) 
                       <button onClick={() => setReportCobro(cobro)} className="text-xs px-2 py-1 rounded border border-dark-border hover:border-accent-yellow hover:text-accent-yellow" title="Descargar reporte PDF">
                         PDF
                       </button>
+                      {canDelete && <button className="icon-button text-status-danger" title={`Eliminar cobro de ${cobro.cliente}`} aria-label={`Eliminar cobro de ${cobro.cliente}`} onClick={() => { setDeleting(cobro); setNotice(''); }}><Trash2 size={17} /></button>}
                     </div>
                   </td>
                 </tr>
@@ -76,6 +83,7 @@ export function Cobros({ onNewClick, userRole = 'operario' }: CobrosProps = {}) 
         </div>
       </Card>
 
+      {deleting && <DeleteFinancialModal title="Eliminar cobro" record={`${deleting.fecha} · ${deleting.cliente} · ${money(deleting.montoCobrado)}`} description="El monto dejara de contar como dinero recibido y volvera al saldo pendiente del cliente. Se conservaran la copia del cobro, el motivo y la auditoria." onClose={() => setDeleting(null)} onConfirm={async motivo => { await deleteCobro(deleting.id, motivo); setDeleting(null); setNotice('Cobro eliminado. La deuda del cliente fue actualizada.'); }} />}
       <ReportDownloadModal
         isOpen={Boolean(reportCobro)}
         title="Recibo de pago"

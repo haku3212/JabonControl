@@ -1,0 +1,23 @@
+const assert = require('node:assert/strict');
+const { mkdtempSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const path = require('node:path');
+process.env.DATABASE_URL = '';
+process.env.DATABASE = path.join(mkdtempSync(path.join(tmpdir(), 'jabon-delete-rollback-')), 'test.db');
+process.env.ENABLE_DEMO_DATA = 'false';
+process.env.ADMIN_PASSWORD = 'qa-local-only';
+const db = require('../backend/db');
+const { deleteFinancialRecord } = require('../backend/utils/financialDeletion');
+(async () => {
+  await db();
+  await db.run("INSERT INTO ventas (id, numeroNE, fecha, cliente, formato, cantidad, precioUnitario, total, tipoPago, saldoPendiente, estado) VALUES ('qa-sale', 'NE-0001', '2026-11-01', 'QA', 'Barras', 1, 100, 100, 'credito', 50, 'parcial')");
+  await db.run("INSERT INTO cobros (id, fecha, cliente, montoCobrado, metodoPago) VALUES ('qa-payment', '2026-11-01', 'QA', 50, 'efectivo')");
+  const originalAudit = db.logAudit;
+  db.logAudit = async () => { throw new Error('QA audit failure'); };
+  await assert.rejects(deleteFinancialRecord({ params: { id: 'qa-payment' }, body: { motivo: 'Registro de prueba' }, user: { usuario: 'qa' } }, 'cobros'), /QA audit failure/);
+  db.logAudit = originalAudit;
+  assert.ok(await db.get("SELECT id FROM cobros WHERE id = 'qa-payment'"));
+  assert.equal((await db.get("SELECT saldoPendiente FROM ventas WHERE id = 'qa-sale'")).saldoPendiente, 50);
+  assert.equal(await db.get("SELECT id FROM app_records WHERE modulo = 'cobros_anulados'"), null);
+  console.log('PASS: Un fallo de auditoria revierte cobro, saldos y copia de anulacion. Base temporal.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

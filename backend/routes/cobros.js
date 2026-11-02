@@ -4,13 +4,15 @@ const dbModule = require('../db');
 const { v4: uuid } = require('uuid');
 const { logAudit } = require('../db');
 const { requireRoles } = require('./auth');
+const { deleteFinancialRecord, withFinancialWrite } = require('../utils/financialDeletion');
+const invalid = (message, status = 400) => Object.assign(new Error(message), { status });
 
-async function recalcularSaldosCliente(cliente) {
-  const ventas = await dbModule.all(
-    'SELECT id, total, tipoPago FROM ventas WHERE cliente = ? ORDER BY fecha ASC, creado_en ASC',
+async function recalcularSaldosCliente(cliente, executor = dbModule) {
+  const ventas = await executor.all(
+    'SELECT id, total, tipoPago FROM ventas WHERE cliente = ? ORDER BY fecha ASC, creado_en ASC, id ASC',
     [cliente]
   );
-  const cobros = await dbModule.all(
+  const cobros = await executor.all(
     'SELECT montoCobrado FROM cobros WHERE cliente = ? ORDER BY fecha ASC, creado_en ASC',
     [cliente]
   );
@@ -32,18 +34,18 @@ async function recalcularSaldosCliente(cliente) {
   for (const venta of ventas) {
     const nuevoSaldo = saldos.get(venta.id) || 0;
     const estado = nuevoSaldo <= 0 ? 'pagado' : nuevoSaldo < Number(venta.total || 0) ? 'parcial' : 'pendiente';
-    await dbModule.run('UPDATE ventas SET saldoPendiente = ?, estado = ? WHERE id = ?', [nuevoSaldo, estado, venta.id]);
+    await executor.run('UPDATE ventas SET saldoPendiente = ?, estado = ? WHERE id = ?', [nuevoSaldo, estado, venta.id]);
   }
 }
 
-async function totalDeudaCliente(cliente, cobroIdIgnorado = null) {
-  const ventas = await dbModule.all(
+async function totalDeudaCliente(cliente, cobroIdIgnorado = null, executor = dbModule) {
+  const ventas = await executor.all(
     'SELECT total, tipoPago FROM ventas WHERE cliente = ?',
     [cliente]
   );
   const cobros = cobroIdIgnorado
-    ? await dbModule.all('SELECT id, montoCobrado FROM cobros WHERE cliente = ? AND id <> ?', [cliente, cobroIdIgnorado])
-    : await dbModule.all('SELECT id, montoCobrado FROM cobros WHERE cliente = ?', [cliente]);
+    ? await executor.all('SELECT id, montoCobrado FROM cobros WHERE cliente = ? AND id <> ?', [cliente, cobroIdIgnorado])
+    : await executor.all('SELECT id, montoCobrado FROM cobros WHERE cliente = ?', [cliente]);
   const totalCredito = ventas.reduce((sum, venta) => (
     sum + (venta.tipoPago === 'credito' ? Number(venta.total || 0) : 0)
   ), 0);
@@ -62,29 +64,29 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
+    const result = await withFinancialWrite(async executor => {
     const { fecha, cliente, montoCobrado, metodoPago, notasCorrespondientes } = req.body;
     const monto = Number(montoCobrado);
     if (!cliente || !Number.isFinite(monto) || monto <= 0 || !['efectivo', 'transferencia', 'deposito', 'cheque'].includes(metodoPago)) {
-      return res.status(400).json({ error: 'Campos requeridos' });
+      throw invalid('Campos requeridos');
     }
-    const deuda = await totalDeudaCliente(cliente);
+    const deuda = await totalDeudaCliente(cliente, null, executor);
     if (monto > deuda) {
-      return res.status(400).json({ error: `El cobro excede la deuda pendiente. Deuda actual: ${deuda}.` });
+      throw invalid(`El cobro excede la deuda pendiente. Deuda actual: ${deuda}.`);
     }
 
     const id = uuid();
-    await dbModule.run(
+    await executor.run(
       `INSERT INTO cobros (id, fecha, cliente, montoCobrado, metodoPago, notasCorrespondientes)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, fecha || new Date().toISOString().split('T')[0], cliente, monto, metodoPago, notasCorrespondientes]
+      [id, fecha || new Date().toISOString().split('T')[0], cliente, monto, metodoPago, notasCorrespondientes || '']
     );
 
-    await recalcularSaldosCliente(cliente);
-
-    await dbModule.save();
-    await logAudit(req, 'crear', 'cobros', id, null, { ...req.body, montoCobrado: monto }, `Cobro de ${monto} registrado para ${cliente}`);
-
-    res.status(201).json({ id, message: 'Cobro registrado' });
+    await recalcularSaldosCliente(cliente, executor);
+    await logAudit(req, 'crear', 'cobros', id, null, { ...req.body, montoCobrado: monto }, `Cobro de ${monto} registrado para ${cliente}`, executor);
+    return { id, message: 'Cobro registrado' };
+    });
+    res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -92,8 +94,9 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', requireRoles('admin', 'supervisor', 'supervisor_ventas', 'finanzas'), async (req, res) => {
   try {
-    const previous = await dbModule.get('SELECT * FROM cobros WHERE id = ?', [req.params.id]);
-    if (!previous) return res.status(404).json({ error: 'Cobro no encontrado' });
+    await withFinancialWrite(async executor => {
+    const previous = await executor.get('SELECT * FROM cobros WHERE id = ?', [req.params.id]);
+    if (!previous) throw invalid('Cobro no encontrado', 404);
 
     const data = {
       fecha: req.body.fecha || previous.fecha,
@@ -104,39 +107,32 @@ router.put('/:id', requireRoles('admin', 'supervisor', 'supervisor_ventas', 'fin
     };
 
     if (!data.cliente || !Number.isFinite(data.montoCobrado) || data.montoCobrado <= 0 || !['efectivo', 'transferencia', 'deposito', 'cheque'].includes(data.metodoPago)) {
-      return res.status(400).json({ error: 'Cliente y monto son obligatorios' });
+      throw invalid('Cliente y monto son obligatorios');
     }
-    const deuda = await totalDeudaCliente(data.cliente, req.params.id);
+    const deuda = await totalDeudaCliente(data.cliente, req.params.id, executor);
     if (data.montoCobrado > deuda) {
-      return res.status(400).json({ error: `El cobro excede la deuda pendiente. Deuda actual: ${deuda}.` });
+      throw invalid(`El cobro excede la deuda pendiente. Deuda actual: ${deuda}.`);
     }
 
-    await dbModule.run(
+    await executor.run(
       'UPDATE cobros SET fecha = ?, cliente = ?, montoCobrado = ?, metodoPago = ?, notasCorrespondientes = ? WHERE id = ?',
       [data.fecha, data.cliente, data.montoCobrado, data.metodoPago, data.notasCorrespondientes, req.params.id]
     );
-    await recalcularSaldosCliente(previous.cliente);
-    if (previous.cliente !== data.cliente) await recalcularSaldosCliente(data.cliente);
-    await dbModule.save();
-    await logAudit(req, 'actualizar', 'cobros', req.params.id, previous, { id: req.params.id, ...data }, `Cobro actualizado para ${data.cliente}`);
+    await recalcularSaldosCliente(previous.cliente, executor);
+    if (previous.cliente !== data.cliente) await recalcularSaldosCliente(data.cliente, executor);
+    await logAudit(req, 'actualizar', 'cobros', req.params.id, previous, { id: req.params.id, ...data }, `Cobro actualizado para ${data.cliente}`, executor);
+    });
     res.json({ message: 'Cobro actualizado' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.message });
   }
 });
 
 router.delete('/:id', requireRoles('admin'), async (req, res) => {
   try {
-    const previous = await dbModule.get('SELECT * FROM cobros WHERE id = ?', [req.params.id]);
-    if (!previous) return res.status(404).json({ error: 'Cobro no encontrado' });
-
-    await dbModule.run('DELETE FROM cobros WHERE id = ?', [req.params.id]);
-    await recalcularSaldosCliente(previous.cliente);
-    await dbModule.save();
-    await logAudit(req, 'eliminar', 'cobros', req.params.id, previous, null, `Cobro ${req.params.id} eliminado`);
-    res.json({ message: 'Cobro eliminado' });
+    res.json(await deleteFinancialRecord(req, 'cobros'));
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.status ? error.message : 'No se pudo eliminar el cobro. No se confirmaron cambios.' });
   }
 });
 

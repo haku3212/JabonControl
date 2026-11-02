@@ -51,8 +51,8 @@ export const apiClient = {
     return parseResponse(response, endpoint);
   },
 
-  async delete(endpoint: string) {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('DELETE'));
+  async delete(endpoint: string, data?: any) {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, requestOptions('DELETE', data));
     return parseResponse(response, endpoint);
   },
 };
@@ -71,8 +71,8 @@ export const ventasService = {
   async actualizar(id: string, data: any) {
     return apiClient.put(`/ventas/${id}`, data);
   },
-  async eliminar(id: string) {
-    return apiClient.delete(`/ventas/${id}`);
+  async eliminar(id: string, motivo: string) {
+    return apiClient.delete(`/ventas/${id}`, { motivo });
   },
 };
 
@@ -127,8 +127,8 @@ export const cobrosService = {
   async actualizar(id: string, data: any) {
     return apiClient.put(`/cobros/${id}`, data);
   },
-  async eliminar(id: string) {
-    return apiClient.delete(`/cobros/${id}`);
+  async eliminar(id: string, motivo: string) {
+    return apiClient.delete(`/cobros/${id}`, { motivo });
   },
 };
 
