@@ -8,21 +8,21 @@ export default {
     extend: {
       colors: {
         dark: {
-          bg: '#f5f6f8',
+          bg: '#f4f6f9',
           surface: '#ffffff',
           surface2: '#f8f9fb',
           surface3: '#edf0f3',
           border: '#e0e5e9',
         },
         accent: {
-          yellow: '#176753',
+          yellow: '#285bc1',
           orange: '#ab642a',
-          blue: '#176753',
+          blue: '#285bc1',
         },
         status: {
-          success: '#4d7a5d',
-          danger: '#a45147',
-          warning: '#8f7a35',
+          success: '#28745c',
+          danger: '#ae4946',
+          warning: '#94671c',
         },
         text: {
           primary: '#242c35',

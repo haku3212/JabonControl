@@ -21,10 +21,10 @@ export function KPICard({ label, value, unit, color, delta }: KPICardProps) {
     <div className={`bg-dark-surface border border-dark-border border-l-[3px] ${colorClasses[color]} rounded-md px-4 py-3 shadow-[0_1px_3px_rgba(36,35,33,0.04)]`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-xs font-medium text-text-tertiary uppercase tracking-wide truncate">
+          <div className="text-xs font-medium text-text-tertiary break-words">
             {label}
           </div>
-          <div className="mt-2 text-[1.7rem] font-semibold text-text-primary leading-none">
+          <div className="mt-2 text-2xl font-semibold text-text-primary leading-tight break-words tabular-nums">
             {value}
           </div>
           <div className="text-xs text-text-tertiary mt-1">

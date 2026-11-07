@@ -188,6 +188,9 @@ export const finanzasService = {
   async crearMovimiento(data: any) {
     return apiClient.post('/finanzas/movimientos', data);
   },
+  async actualizarMovimiento(id: string, data: any) {
+    return apiClient.put(`/finanzas/movimientos/${encodeURIComponent(id)}`, data);
+  },
   async importarMovimientos(movimientos: any[]) {
     return apiClient.post('/finanzas/importar', { movimientos });
   },
