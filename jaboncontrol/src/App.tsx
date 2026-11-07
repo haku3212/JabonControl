@@ -13,6 +13,7 @@ import { Cobros } from './components/panels/Cobros';
 import { Clientes } from './components/panels/Clientes';
 import { Finanzas } from './components/panels/Finanzas';
 import { ComprasGastos } from './components/panels/ComprasGastos';
+import { Contabilidad } from './components/panels/Contabilidad';
 import { Proyectos } from './components/panels/Proyectos';
 import { Contactos } from './components/panels/AgendaContactos';
 import { Documentacion } from './components/panels/Documentacion';
@@ -43,6 +44,7 @@ const panelTitles: Record<string, [string, string]> = {
   clientes: ['Clientes', 'COMERCIAL / CLIENTES'],
   finanzas: ['Finanzas', 'FINANZAS / FLUJO DE CAJA'],
   compras_gastos: ['Compras y Gastos', 'FINANZAS / EGRESOS'],
+  contabilidad: ['Contabilidad', 'FINANZAS / CONTABILIDAD'],
   proyectos: ['Proyectos', 'GESTIÓN / PROYECTOS'],
   contactos: ['Contactos', 'GESTIÓN / CONTACTOS'],
   documentacion: ['Documentación', 'GESTIÓN / DOCUMENTACIÓN'],
@@ -247,6 +249,7 @@ function AppContent({ user, onLogout }: { user: { id: string; nombre: string; us
     clientes: <Clientes onNewClick={() => setModalType('cliente')} />,
     finanzas: <Finanzas />,
     compras_gastos: <ComprasGastos />,
+    contabilidad: <Contabilidad />,
     proyectos: <Proyectos />,
     contactos: <Contactos userRole={user.rol} />,
     documentacion: <Documentacion onNewClick={() => setModalType('documento')} />,

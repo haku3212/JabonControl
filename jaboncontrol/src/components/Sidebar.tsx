@@ -19,6 +19,7 @@ const sections: Array<{ label: string; items: Array<{ id: string; icon: LucideIc
   { label: 'Finanzas', items: [
     { id: 'finanzas', icon: ChartNoAxesCombined, label: 'Resumen financiero' },
     { id: 'compras_gastos', icon: ReceiptText, label: 'Compras y gastos' },
+    { id: 'contabilidad', icon: ClipboardCheck, label: 'Contabilidad' },
   ] },
   { label: 'Administracion', items: [
     { id: 'usuarios', icon: UserRoundCog, label: 'Usuarios' },
